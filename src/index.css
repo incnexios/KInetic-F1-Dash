@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+body {
+  background-color: #0a0a0a;
+  color: #f8fafc;
+  background-image: radial-gradient(circle at 2px 2px, #1a1a1a 1px, transparent 0);
+  background-size: 4px 4px;
+}
+
+/* Custom react-grid-layout resize handler styling */
+.react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  z-index: 50;
+  background-image: none !important;
+}
+.react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(255, 255, 255, 0.4);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+  transition: border-color 0.2s;
+}
+.react-resizable-handle:hover::after {
+  border-color: rgba(255, 255, 255, 0.9);
+}
