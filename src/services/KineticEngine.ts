@@ -248,8 +248,7 @@ function parseZData(base64Str: string) {
     }
 }
 
-function parseTelemetry(base64: string, driversMap: Record<string, DriverState>) {
-   const decoded = parseZData(base64);
+function parseTelemetry(decoded: any, driversMap: Record<string, DriverState>) {
    if (decoded && decoded.Entries && decoded.Entries.length > 0) {
        const latest = decoded.Entries[decoded.Entries.length - 1];
        if (latest && latest.Cars) {
@@ -261,7 +260,7 @@ function parseTelemetry(base64: string, driversMap: Record<string, DriverState>)
                    drv.telemetry.speed = ch[2] ?? drv.telemetry.speed;
                    drv.telemetry.gear = ch[3] ?? drv.telemetry.gear;
                    drv.telemetry.throttle = ch[4] ?? drv.telemetry.throttle;
-                   drv.telemetry.brake = ch[5] ?? drv.telemetry.brake;
+                   drv.telemetry.brake = ch[5] ? 100 : 0;
                    drv.telemetry.drs = ch[45] ?? drv.telemetry.drs;
                }
            });
@@ -269,8 +268,7 @@ function parseTelemetry(base64: string, driversMap: Record<string, DriverState>)
    }
 }
 
-function parsePosition(base64: string, driversMap: Record<string, DriverState>) {
-    const decoded = parseZData(base64);
+function parsePosition(decoded: any, driversMap: Record<string, DriverState>) {
     if (decoded && decoded.Position && decoded.Position.length > 0) {
         const latest = decoded.Position[decoded.Position.length - 1];
         if (latest && latest.Entries) {
@@ -316,9 +314,11 @@ function showNotification(title: string, body: string) {
 
 export class KineticEngine {
     private ws: WebSocket | null = null;
-    private queue: { timestamp: number, data: any }[] = [];
+    private queue: { timestamp: number, key: string, data: any }[] = [];
     private intervalId: any = null;
-    readonly URI = "wss://api.pitwall.me/ws";
+    private reconnectAttempts = 0;
+    private reconnectTimeout: any = null;
+    readonly URI = "wss://proxy.cloudflare-eggshell171.workers.dev";
 
     connect() {
         if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -326,11 +326,30 @@ export class KineticEngine {
         }
 
         this.ws = new WebSocket(this.URI);
-        this.ws.binaryType = "arraybuffer";
 
         this.ws.onopen = () => {
-            console.log('KineticEngine: Connected to Pitwall proxy');
+            console.log('KineticEngine: Connected to F1 proxy');
             useKineticStore.getState().setConnected(true);
+            this.reconnectAttempts = 0;
+            
+            this.ws?.send(JSON.stringify({
+                H: "Streaming",
+                M: "Subscribe",
+                A: [["Heartbeat", "SessionInfo", "SessionData", "TrackStatus", "DriverList", "RaceControlMessages", "LapCount", "TimingData", "TimingStats", "TimingAppData", "WeatherData", "ExtrapolatedClock", "TeamRadio", "DriverTracker"]],
+                I: 1
+            }));
+
+            setTimeout(() => {
+                if (this.ws?.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        H: "Streaming",
+                        M: "Subscribe",
+                        A: [["CarData.z", "Position.z"]],
+                        I: 2
+                    }));
+                }
+            }, 2000);
+
             if (this.intervalId === null) {
                 this.intervalId = setInterval(() => this.processQueue(), 100);
             }
@@ -338,30 +357,32 @@ export class KineticEngine {
 
         this.ws.onmessage = (event) => {
             try {
-                let jsonStr = "";
-                if (event.data instanceof ArrayBuffer) {
-                    try {
-                        jsonStr = pako.inflateRaw(new Uint8Array(event.data), { to: 'string' });
-                    } catch (e) {
-                        try {
-                            jsonStr = pako.inflate(new Uint8Array(event.data), { to: 'string' });
-                        } catch (err) {
-                            return;
+                const r = JSON.parse(event.data);
+                if (r.M && Array.isArray(r.M)) {
+                    r.M.forEach((e: any) => {
+                        let key = "unknown";
+                        let val = e;
+                        if (e.M === "feed" && e.A?.length >= 2) {
+                            key = e.A[0];
+                            val = e.A[1];
+                        } else if (e.M) {
+                            key = e.M;
+                            val = e.A ? e.A[0] : e;
                         }
-                    }
-                } else {
-                    jsonStr = event.data;
+
+                        if (typeof key === "string" && key.endsWith(".z") && typeof val === "string") {
+                            const decoded = parseZData(val);
+                            if (!decoded) return;
+                            val = decoded;
+                        }
+
+                        this.enqueueMessage(key, val);
+                    });
+                } else if (r.R) {
+                    useKineticStore.getState().setInitialState(r.R);
                 }
-                if (!jsonStr) return;
-                
-                const parsed = JSON.parse(jsonStr);
-                if (parsed && parsed.type === 'bundle' && Array.isArray(parsed.messages)) {
-                    parsed.messages.forEach((m: any) => this.enqueueMessage(m));
-                } else {
-                    this.enqueueMessage(parsed);
-                }
-            } catch (e) {
-                // Ignore parse errors on bad packets
+            } catch (err) {
+                // error parsing, ignore
             }
         };
 
@@ -372,16 +393,21 @@ export class KineticEngine {
                 clearInterval(this.intervalId);
                 this.intervalId = null;
             }
-            setTimeout(() => this.connect(), 5000);
+            
+            if (this.reconnectAttempts < 5) {
+                this.reconnectAttempts += 1;
+                const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
+                this.reconnectTimeout = setTimeout(() => this.connect(), delay);
+            }
+        };
+        
+        this.ws.onerror = () => {
+           // handled by onclose
         };
     }
 
-    private enqueueMessage(msg: any) {
-        if (typeof msg === 'object' && msg !== null && 'R' in msg) {
-            useKineticStore.getState().setInitialState(msg.R);
-        } else {
-            this.queue.push({ timestamp: Date.now(), data: msg });
-        }
+    private enqueueMessage(key: string, data: any) {
+        this.queue.push({ timestamp: Date.now(), key, data });
     }
 
     private processQueue() {
@@ -392,19 +418,8 @@ export class KineticEngine {
         while (this.queue.length > 0 && (now - this.queue[0].timestamp) >= syncDelayMs) {
             const item = this.queue.shift();
             if (item) {
-                this.applyFeed(item.data);
+                store.applyFeedUpdate(item.key, item.data);
             }
-        }
-    }
-
-    private applyFeed(data: any) {
-        const store = useKineticStore.getState();
-        if (data && data.M && Array.isArray(data.M)) {
-            data.M.forEach((r: any) => {
-                if (r && r.H === "Streaming" && r.M === "feed" && Array.isArray(r.A) && r.A.length >= 2) {
-                    store.applyFeedUpdate(r.A[0], r.A[1]);
-                }
-            });
         }
     }
 
@@ -412,6 +427,10 @@ export class KineticEngine {
         if (this.ws) {
             this.ws.close();
             this.ws = null;
+        }
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
         }
     }
 }

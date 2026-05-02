@@ -6,6 +6,7 @@ import { LiveTimingTable } from './components/LiveTimingTable';
 import { CustomChart } from './components/CustomChart';
 import { ChampionshipStandings } from './components/ChampionshipStandings';
 import { WeatherConditions } from './components/WeatherConditions';
+import { TyreStints } from './components/TyreStints';
 
 export const WidgetRegistry = {
     LiveLeaderboard,
@@ -13,6 +14,7 @@ export const WidgetRegistry = {
     TrackMap: MapMapper,
     RaceStatus: RaceStatusPanel,
     LiveTimingTable,
+    TyreStints,
     CustomChart,
     ChampionshipStandings,
     WeatherConditions,

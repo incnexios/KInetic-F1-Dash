@@ -4,6 +4,7 @@ import { Responsive as ResponsiveGridLayout, WidthProvider } from 'react-grid-la
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { Check, LayoutGrid, Plus, X } from 'lucide-react';
+import { cn } from './lib/utils';
 
 import { kineticEngine, useKineticStore } from './services/KineticEngine';
 import { WidgetRegistry } from './WidgetRegistry';
@@ -17,7 +18,8 @@ const initialLayouts = {
     { i: 'timing', x: 2, y: 0, w: 8, h: 14, minW: 6, minH: 5 },
     { i: 'map', x: 2, y: 14, w: 4, h: 8, minW: 3, minH: 4 },
     { i: 'telemetry', x: 6, y: 14, w: 4, h: 8, minW: 3, minH: 4 },
-    { i: 'status', x: 10, y: 0, w: 2, h: 22, minW: 2, minH: 4 },
+    { i: 'status', x: 10, y: 0, w: 2, h: 10, minW: 2, minH: 4 },
+    { i: 'tyres', x: 10, y: 10, w: 2, h: 12, minW: 2, minH: 4 },
   ],
 };
 
@@ -27,13 +29,31 @@ const initialWidgets = [
   { id: 'telemetry', type: 'TelemetryOverlay' },
   { id: 'map', type: 'TrackMap' },
   { id: 'status', type: 'RaceStatus' },
+  { id: 'tyres', type: 'TyreStints' },
 ];
+
+const LOCAL_STORAGE_KEY = 'f1_pitwall_layout_v1';
+const LOCAL_STORAGE_WIDGETS_KEY = 'f1_pitwall_widgets_v1';
 
 export default function App() {
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const [layouts, setLayouts] = useState<any>(initialLayouts);
-  const [widgets, setWidgets] = useState<any[]>(initialWidgets);
+  const [layouts, setLayouts] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : initialLayouts;
+    } catch {
+      return initialLayouts;
+    }
+  });
+  const [widgets, setWidgets] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_WIDGETS_KEY);
+      return saved ? JSON.parse(saved) : initialWidgets;
+    } catch {
+      return initialWidgets;
+    }
+  });
   const [showAddWidget, setShowAddWidget] = useState(false);
   const connected = useKineticStore(state => state.connected);
   const rs = useKineticStore(state => state.raceState);
@@ -43,22 +63,32 @@ export default function App() {
     return () => kineticEngine.disconnect();
   }, []);
 
+  const saveLayouts = (newLayouts: any) => {
+    setLayouts(newLayouts);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newLayouts));
+  };
+
+  const saveWidgets = (newWidgets: any[]) => {
+    setWidgets(newWidgets);
+    localStorage.setItem(LOCAL_STORAGE_WIDGETS_KEY, JSON.stringify(newWidgets));
+  };
+
   const handleLayoutChange = (layout: any, allLayouts: any) => {
-    setLayouts(allLayouts);
+    saveLayouts(allLayouts);
   };
 
   const removeWidget = (id: string) => {
-    setWidgets(widgets.filter(w => w.id !== id));
+    saveWidgets(widgets.filter(w => w.id !== id));
     const newLg = layouts.lg?.filter((l: any) => l.i !== id) || [];
-    setLayouts({ ...layouts, lg: newLg });
+    saveLayouts({ ...layouts, lg: newLg });
   };
 
   const addWidget = (type: string) => {
     const id = `${type}-${Date.now()}`;
     const newWidget = { id, type };
-    setWidgets([...widgets, newWidget]);
+    saveWidgets([...widgets, newWidget]);
     const newLg = [...(layouts.lg || []), { i: id, x: 0, y: Infinity, w: 3, h: 4, minW: 2, minH: 3 }];
-    setLayouts({ ...layouts, lg: newLg });
+    saveLayouts({ ...layouts, lg: newLg });
     setShowAddWidget(false);
   };
 
@@ -69,11 +99,50 @@ export default function App() {
            <div className="bg-[#e10600] text-white font-black px-3 py-1 text-xl italic tracking-tighter rounded-sm shadow-[0_0_15px_rgba(225,6,0,0.5)]">KINETIC</div>
            <div className="h-6 w-[1px] bg-white/20"></div>
            <div className="flex flex-col">
-             <span className="text-[10px] uppercase tracking-widest text-[#e10600] font-bold leading-none mb-1">Live Pitwall</span>
+             <div className="flex items-center gap-2 mb-1">
+                 <span className="text-[10px] uppercase tracking-widest text-[#e10600] font-bold leading-none">Live Pitwall</span>
+                 {rs.SessionInfo?.Type && (
+                     <span className="text-[9px] uppercase tracking-widest bg-white/10 text-white px-1.5 py-0.5 rounded-sm font-bold leading-none">
+                         {rs.SessionInfo.Type}
+                     </span>
+                 )}
+             </div>
              <span className="font-bold text-sm tracking-tight">{rs.SessionInfo?.Meeting?.Name || 'Grand Prix Session'}</span>
            </div>
          </div>
          
+         {/* Center: Track Status */}
+         <div className="hidden md:flex flex-1 justify-center">
+            {rs.TrackStatus?.Status && (
+                <div className={cn(
+                    "px-4 py-1.5 rounded-sm border flex items-center gap-2 font-bold uppercase tracking-widest text-xs shadow-lg transition-colors",
+                    rs.TrackStatus.Status === '1' ? "bg-green-500/20 border-green-500/50 text-green-400" :
+                    rs.TrackStatus.Status === '2' ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400" :
+                    rs.TrackStatus.Status === '4' ? "bg-orange-500/20 border-orange-500/50 text-orange-400" :
+                    rs.TrackStatus.Status === '5' ? "bg-red-500/20 border-red-500/50 text-red-500" :
+                    rs.TrackStatus.Status === '6' || rs.TrackStatus.Status === '7' ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400" :
+                    "bg-white/10 border-white/20 text-white"
+                )}>
+                    <div className={cn(
+                        "w-2 h-2 rounded-full animate-pulse",
+                        rs.TrackStatus.Status === '1' ? "bg-green-500" :
+                        rs.TrackStatus.Status === '2' ? "bg-yellow-500" :
+                        rs.TrackStatus.Status === '4' ? "bg-orange-500" :
+                        rs.TrackStatus.Status === '5' ? "bg-red-500" :
+                        rs.TrackStatus.Status === '6' || rs.TrackStatus.Status === '7' ? "bg-yellow-500" :
+                        "bg-white"
+                    )}></div>
+                    {rs.TrackStatus.Status === '1' ? 'TRACK CLEAR' :
+                     rs.TrackStatus.Status === '2' ? 'YELLOW FLAG' :
+                     rs.TrackStatus.Status === '4' ? 'SAFETY CAR' :
+                     rs.TrackStatus.Status === '5' ? 'RED FLAG' :
+                     rs.TrackStatus.Status === '6' ? 'VSC DEPLOYED' :
+                     rs.TrackStatus.Status === '7' ? 'VSC ENDING' :
+                     'UNKNOWN STATUS'}
+                </div>
+            )}
+         </div>
+
          <div className="flex items-center gap-4">
             {editMode && (
                 <div className="relative">

@@ -1,13 +1,15 @@
 import React from 'react';
 import { useKineticStore } from '../services/KineticEngine';
 import { cn } from '../lib/utils';
-import { DRIVER_DATA } from '../constants/driverData';
+import { DRIVER_DATA, getDriverNumberUrl } from '../constants/driverData';
 
 export function LiveLeaderboard({ selectedDriver, onSelectDriver }: { selectedDriver: string | null, onSelectDriver: (num: string) => void }) {
   const driversMap = useKineticStore((state) => state.driversMap);
   const rs = useKineticStore((state) => state.raceState);
   
-  const sortedDrivers = Object.values(driversMap).sort((a, b) => {
+  const sortedDrivers = Object.values(driversMap)
+      .filter(drv => drv.tla && drv.racingNumber && drv.racingNumber !== "0" && drv.racingNumber !== "" && drv.position && drv.position !== "0")
+      .sort((a, b) => {
       let rA = parseInt(a.position || "99", 10);
       let rB = parseInt(b.position || "99", 10);
       return (a.retired || a.stopped) && !(b.retired || b.stopped) ? 1 : !(a.retired || a.stopped) && (b.retired || b.stopped) ? -1 : rA - rB;
@@ -63,8 +65,9 @@ export function LiveLeaderboard({ selectedDriver, onSelectDriver }: { selectedDr
                   const config = getDriverConfig(drv.racingNumber, drv.tla);
                   const teamColor = config?.constructor.color_rgb ? `rgb(${config.constructor.color_rgb})` : `#${drv.teamColour || 'ffffff'}`;
                   
-                  const tyreDataList = rs.TyreStintSeries?.[drv.racingNumber]?.Stints || [];
-                  const mockStints = tyreDataList.length > 0 ? tyreDataList.map((t: any) => t.Compound) : ['M'];
+                  const timingAppData = rs.TimingAppData?.Lines?.[drv.racingNumber]?.Stints || [];
+                  const tyreDataList = rs.TyreStintSeries?.[drv.racingNumber]?.Stints || timingAppData;
+                  const mockStints = tyreDataList.length > 0 ? tyreDataList.map((t: any) => t.Compound || t.TyreCompound) : [];
                   
                   const timing = timingData[drv.racingNumber] || {};
                   const stats = timingStats[drv.racingNumber] || {};

@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useKineticStore } from '../services/KineticEngine';
 import { motion } from 'motion/react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { GH_RAW, CIRCUIT_MAP } from '../constants/circuits';
 
 export function MapMapper({ selectedDriver }: { selectedDriver: string | null }) {
@@ -110,64 +111,76 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
                  </div>
             )}
             {hasData && (
-                 <svg 
-                    viewBox={`${minX} ${minY} ${spanX} ${spanY}`} 
-                    className="w-full h-full opacity-80"
-                    style={{ transform: 'scaleY(-1)' }} // Invert Y axis as F1 telemetry uses y-up instead of SVG y-down
+                 <TransformWrapper
+                     initialScale={1}
+                     minScale={0.5}
+                     maxScale={10}
+                     centerOnInit={true}
+                     wheel={{ step: 0.1 }}
+                     panning={{ velocityDisabled: true }}
                  >
-                     {/* Draw Track Path dynamically from historic points */}
-                     {trackPath.length > 0 && (
-                         <path
-                             d={`M ${trackPath.map(p => `${p.x},${p.y}`).join(' L ')}`}
-                             fill="none"
-                             stroke="rgba(255,255,255,0.15)"
-                             strokeWidth={spanX * 0.008}
-                             strokeLinecap="round"
-                             strokeLinejoin="round"
-                         />
-                     )}
-     
-                     {/* Draw Cars */}
-                     {Object.values(driversMap).map(drv => {
-                         if (drv.positionData.x === 0 && drv.positionData.y === 0) return null;
-                         if (drv.inPit || drv.stopped || drv.retired) return null;
-                         const isSelected = selectedDriver === drv.racingNumber;
-                         return (
-                             <motion.g 
-                                key={drv.racingNumber}
-                                animate={{ x: drv.positionData.x, y: drv.positionData.y }}
-                                transition={{ type: 'tween', duration: 0.1, ease: 'linear' }}
-                             >
-                                <circle 
-                                   r={spanX * (isSelected ? 0.025 : 0.015)} 
-                                   fill={`#${drv.teamColour || 'ffffff'}`} 
-                                   stroke={isSelected ? '#fff' : '#000'}
-                                   strokeWidth={spanX * 0.005}
-                                />
-                                {isSelected && (
-                                  <circle 
-                                     r={spanX * 0.04}
+                     <TransformComponent wrapperClass="w-full h-full" contentClass="w-full h-full flex items-center justify-center">
+                         <svg 
+                            viewBox={`${minX} ${minY} ${spanX} ${spanY}`} 
+                            className="w-full h-full opacity-80 cursor-grab active:cursor-grabbing"
+                            style={{ transform: 'scaleY(-1)' }} // Invert Y axis as F1 telemetry uses y-up instead of SVG y-down
+                         >
+                             {/* Draw Track Path dynamically from historic points */}
+                             {trackPath.length > 0 && (
+                                 <path
+                                     d={`M ${trackPath.map(p => `${p.x},${p.y}`).join(' L ')}`}
                                      fill="none"
-                                     stroke="#fff"
-                                     strokeWidth={spanX * 0.003}
-                                     strokeDasharray={`${spanX * 0.015}`}
-                                  />
-                                )}
-                                <text 
-                                   x={spanX * 0.025}
-                                   y={Math.abs(spanY) * 0.01}
-                                   fill="#fff"
-                                   fontSize={spanX * 0.035}
-                                   fontWeight="bold"
-                                   fontFamily="Inter, sans-serif"
-                                   style={{ transform: 'scaleY(-1)' }} // Fix text inversion
-                                >
-                                   {drv.racingNumber}
-                                </text>
-                             </motion.g>
-                         );
-                     })}
-                 </svg>
+                                     stroke="rgba(255,255,255,0.15)"
+                                     strokeWidth={spanX * 0.008}
+                                     strokeLinecap="round"
+                                     strokeLinejoin="round"
+                                 />
+                             )}
+             
+                             {/* Draw Cars */}
+                             {Object.values(driversMap).map(drv => {
+                                 if (drv.racingNumber === "0" || !drv.tla) return null;
+                                 if (drv.positionData.x === 0 && drv.positionData.y === 0) return null;
+                                 if (drv.inPit || drv.stopped || drv.retired) return null;
+                                 const isSelected = selectedDriver === drv.racingNumber;
+                                 return (
+                                     <motion.g 
+                                        key={drv.racingNumber}
+                                        animate={{ x: drv.positionData.x, y: drv.positionData.y }}
+                                        transition={{ type: 'tween', duration: 0.1, ease: 'linear' }}
+                                     >
+                                        <circle 
+                                           r={spanX * (isSelected ? 0.025 : 0.015)} 
+                                           fill={`#${drv.teamColour || 'ffffff'}`} 
+                                           stroke={isSelected ? '#fff' : '#000'}
+                                           strokeWidth={spanX * 0.005}
+                                        />
+                                        {isSelected && (
+                                          <circle 
+                                             r={spanX * 0.04}
+                                             fill="none"
+                                             stroke="#fff"
+                                             strokeWidth={spanX * 0.003}
+                                             strokeDasharray={`${spanX * 0.015}`}
+                                          />
+                                        )}
+                                        <text 
+                                           x={spanX * 0.025}
+                                           y={Math.abs(spanY) * 0.01}
+                                           fill="#fff"
+                                           fontSize={spanX * 0.035}
+                                           fontWeight="bold"
+                                           fontFamily="Inter, sans-serif"
+                                           style={{ transform: 'scaleY(-1)' }} // Fix text inversion
+                                        >
+                                           {drv.racingNumber}
+                                        </text>
+                                     </motion.g>
+                                 );
+                             })}
+                         </svg>
+                     </TransformComponent>
+                 </TransformWrapper>
             )}
         </div>
     </div>

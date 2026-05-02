@@ -1,3 +1,35 @@
+export const DRIVER_NUMBER_IMGS: Record<string, string> = {
+  NOR: 'mclaren/lannor01',
+  PIA: 'mclaren/oscpia01',
+  RUS: 'mercedes/georus01',
+  ANT: 'mercedes/andant01',
+  VER: 'redbullracing/maxver01',
+  HAD: 'redbullracing/isahad01',
+  LEC: 'ferrari/chalec01',
+  HAM: 'ferrari/lewham01',
+  SAI: 'williams/carsai01',
+  ALB: 'williams/alealb01',
+  LAW: 'racingbulls/lialaw01',
+  LIN: 'racingbulls/arvlin01',
+  ALO: 'astonmartin/feralo01',
+  STR: 'astonmartin/lanstr01',
+  OCO: 'haasf1team/estoco01',
+  BEA: 'haasf1team/olibea01',
+  GAS: 'alpine/piegas01',
+  COL: 'alpine/fracol01',
+  HUL: 'audi/nichul01',
+  BOR: 'audi/gabbor01',
+  PER: 'cadillac/serper01',
+  BOT: 'cadillac/valbot01'
+};
+
+export const getDriverNumberUrl = (tla: string) => {
+    const p = DRIVER_NUMBER_IMGS[tla];
+    if (!p) return null;
+    const [team, rider] = p.split('/');
+    return `https://media.formula1.com/image/upload/c_fit,w_876,h_742/q_auto/v1740000001/common/f1/2026/${team}/${rider}/2026${team}${rider}numberwhitefrless.webp`;
+};
+
 export const DRIVER_DATA = [
   {"rank":1,"driver_id":166,"year":2026,"driver_season":{"driver":{"code":"NOR","name":"Norris","full_name":"Lando Norris"},"constructor":{"car":[{"year":2026,"color_rgb":"255,128,0","constructor_normalized_logo_url":"https://images.prismic.io/formula-1-dashboard/Z7ZYlJ7c43Q3f_Pd_mclaren-normalized-logo.png"}],"name":"McLaren","color_rgb":"255,128,0","constructor_normalized_logo_url":"https://images.prismic.io/formula-1-dashboard/Z7ZYlJ7c43Q3f_Pd_mclaren-normalized-logo.png"},"portrait_url":"https://images.prismic.io/formula-1-dashboard/Z9VKeziBA97Gig6v_2025-norris.avif","driver_number":1}},
   {"rank":2,"driver_id":167,"year":2026,"driver_season":{"driver":{"code":"PIA","name":"Piastri","full_name":"Oscar Piastri"},"constructor":{"car":[{"year":2026,"color_rgb":"255,128,0","constructor_normalized_logo_url":"https://images.prismic.io/formula-1-dashboard/Z7ZYlJ7c43Q3f_Pd_mclaren-normalized-logo.png"}],"name":"McLaren","color_rgb":"255,128,0","constructor_normalized_logo_url":"https://images.prismic.io/formula-1-dashboard/Z7ZYlJ7c43Q3f_Pd_mclaren-normalized-logo.png"},"portrait_url":"https://images.prismic.io/formula-1-dashboard/Z9VKfTiBA97Gig6x_2025-piastri.avif","driver_number":81}},
