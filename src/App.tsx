@@ -20,6 +20,7 @@ const initialLayouts = {
     { i: 'telemetry', x: 6, y: 14, w: 4, h: 8, minW: 3, minH: 4 },
     { i: 'status', x: 10, y: 0, w: 2, h: 10, minW: 2, minH: 4 },
     { i: 'tyres', x: 10, y: 10, w: 2, h: 12, minW: 2, minH: 4 },
+    { i: 'streams', x: 12, y: 0, w: 4, h: 10, minW: 3, minH: 6 },
   ],
 };
 
@@ -30,6 +31,7 @@ const initialWidgets = [
   { id: 'map', type: 'TrackMap' },
   { id: 'status', type: 'RaceStatus' },
   { id: 'tyres', type: 'TyreStints' },
+  { id: 'streams', type: 'StreamsWidget' },
 ];
 
 const LOCAL_STORAGE_KEY = 'f1_pitwall_layout_v1';
@@ -41,7 +43,14 @@ export default function App() {
   const [layouts, setLayouts] = useState<any>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : initialLayouts;
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && parsed.lg) {
+          if (!parsed.lg.some((l: any) => l.i === 'streams')) {
+              parsed.lg.push({ i: 'streams', x: 0, y: Infinity, w: 4, h: 10, minW: 3, minH: 6 });
+          }
+          return parsed;
+      }
+      return initialLayouts;
     } catch {
       return initialLayouts;
     }
@@ -49,7 +58,15 @@ export default function App() {
   const [widgets, setWidgets] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_WIDGETS_KEY);
-      return saved ? JSON.parse(saved) : initialWidgets;
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed) {
+        // Auto-add new streams widget to existing save if missing
+        if (!parsed.some((w: any) => w.type === 'StreamsWidget')) {
+            return [...parsed, { id: 'streams', type: 'StreamsWidget' }];
+        }
+        return parsed;
+      }
+      return initialWidgets;
     } catch {
       return initialWidgets;
     }

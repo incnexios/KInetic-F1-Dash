@@ -7,6 +7,7 @@ import { CustomChart } from './components/CustomChart';
 import { ChampionshipStandings } from './components/ChampionshipStandings';
 import { WeatherConditions } from './components/WeatherConditions';
 import { TyreStints } from './components/TyreStints';
+import { StreamsWidget } from './components/StreamsWidget';
 
 export const WidgetRegistry = {
     LiveLeaderboard,
@@ -15,6 +16,7 @@ export const WidgetRegistry = {
     RaceStatus: RaceStatusPanel,
     LiveTimingTable,
     TyreStints,
+    StreamsWidget,
     CustomChart,
     ChampionshipStandings,
     WeatherConditions,
