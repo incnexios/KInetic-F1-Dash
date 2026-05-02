@@ -7,7 +7,7 @@ export function StreamsWidget() {
 
     const urls = {
         SD: 'https://streamcrichd.com/update/skyf1.php',
-        HD: 'https://dlstreams.com/stream/stream-60.php'
+        HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1'
     };
 
     return (
@@ -37,7 +37,6 @@ export function StreamsWidget() {
                 <iframe 
                     src={urls[quality]} 
                     className="w-full h-full border-0"
-                    sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-forms"
                     allowFullScreen
                     allow="encrypted-media; autoplay; fullscreen"
                 />

@@ -14,28 +14,28 @@ const ResponsiveGridLayoutWithWidth = WidthProvider(ResponsiveGridLayout);
 
 const initialLayouts = {
   lg: [
-    { i: 'leaderboard', x: 0, y: 0, w: 2, h: 22, minW: 2, minH: 5 },
-    { i: 'timing', x: 2, y: 0, w: 8, h: 14, minW: 6, minH: 5 },
-    { i: 'map', x: 2, y: 14, w: 4, h: 8, minW: 3, minH: 4 },
-    { i: 'telemetry', x: 6, y: 14, w: 4, h: 8, minW: 3, minH: 4 },
-    { i: 'status', x: 10, y: 0, w: 2, h: 10, minW: 2, minH: 4 },
-    { i: 'tyres', x: 10, y: 10, w: 2, h: 12, minW: 2, minH: 4 },
-    { i: 'streams', x: 12, y: 0, w: 4, h: 10, minW: 3, minH: 6 },
+    { i: 'leaderboard', x: 0, y: 0, w: 3, h: 24, minW: 2, minH: 5 },
+    { i: 'streams', x: 3, y: 0, w: 7, h: 14, minW: 3, minH: 6 },
+    { i: 'status', x: 10, y: 0, w: 2, h: 14, minW: 2, minH: 4 },
+    { i: 'timing', x: 3, y: 14, w: 9, h: 10, minW: 6, minH: 5 },
+    { i: 'map', x: 0, y: 24, w: 4, h: 8, minW: 3, minH: 4 },
+    { i: 'telemetry', x: 4, y: 24, w: 4, h: 8, minW: 3, minH: 4 },
+    { i: 'tyres', x: 8, y: 24, w: 4, h: 8, minW: 2, minH: 4 },
   ],
 };
 
 const initialWidgets = [
   { id: 'leaderboard', type: 'LiveLeaderboard' },
-  { id: 'timing', type: 'LiveTimingTable' },
-  { id: 'telemetry', type: 'TelemetryOverlay' },
-  { id: 'map', type: 'TrackMap' },
-  { id: 'status', type: 'RaceStatus' },
-  { id: 'tyres', type: 'TyreStints' },
   { id: 'streams', type: 'StreamsWidget' },
+  { id: 'status', type: 'RaceStatus' },
+  { id: 'timing', type: 'LiveTimingTable' },
+  { id: 'map', type: 'TrackMap' },
+  { id: 'telemetry', type: 'TelemetryOverlay' },
+  { id: 'tyres', type: 'TyreStints' },
 ];
 
-const LOCAL_STORAGE_KEY = 'f1_pitwall_layout_v1';
-const LOCAL_STORAGE_WIDGETS_KEY = 'f1_pitwall_widgets_v1';
+const LOCAL_STORAGE_KEY = 'f1_pitwall_layout_v2';
+const LOCAL_STORAGE_WIDGETS_KEY = 'f1_pitwall_widgets_v2';
 
 export default function App() {
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);

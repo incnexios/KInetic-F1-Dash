@@ -102,7 +102,15 @@ export function LiveLeaderboard({ selectedDriver, onSelectDriver }: { selectedDr
                                 <div className="w-1 h-8 rounded-full" style={{ backgroundColor: teamColor }}></div>
                              </div>
                              
-                             <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pl-2 pr-2">
+                             <div className="w-6 shrink-0 flex items-center justify-center ml-2 opacity-80">
+                                 {getDriverNumberUrl(drv.tla) ? (
+                                     <img src={getDriverNumberUrl(drv.tla)} alt={drv.racingNumber} className="h-4 w-auto object-contain" />
+                                 ) : (
+                                     <span className="opacity-50 text-[10px] font-bold">{drv.racingNumber}</span>
+                                 )}
+                             </div>
+                             
+                             <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pl-1 pr-2">
                                 <div className="flex items-center justify-between">
                                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                       {config?.constructor.constructor_normalized_logo_url && (
