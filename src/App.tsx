@@ -34,8 +34,8 @@ const initialWidgets = [
   { id: 'tyres', type: 'TyreStints' },
 ];
 
-const LOCAL_STORAGE_KEY = 'f1_pitwall_layout_v2';
-const LOCAL_STORAGE_WIDGETS_KEY = 'f1_pitwall_widgets_v2';
+const LOCAL_STORAGE_KEY = 'f1_pitwall_layout_v3';
+const LOCAL_STORAGE_WIDGETS_KEY = 'f1_pitwall_widgets_v3';
 
 export default function App() {
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);

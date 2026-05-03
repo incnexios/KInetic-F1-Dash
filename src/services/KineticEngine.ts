@@ -45,6 +45,7 @@ export interface RaceState {
   SessionInfo: any;
   SessionData: any;
   TimingData: any;
+  TimingAppData: any;
   TimingStats: any;
   CarDataZ: any;
   PositionZ: any;
@@ -73,6 +74,7 @@ function createEmptyRaceState(): RaceState {
     SessionInfo: null,
     SessionData: null,
     TimingData: { Lines: {}, SessionPart: 0 },
+    TimingAppData: { Lines: {} },
     TimingStats: { Lines: {} },
     CarDataZ: null,
     PositionZ: null,
@@ -122,6 +124,14 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
     set((prev) => {
       const rs = { ...prev.raceState } as any;
       switch (key) {
+        case '_reset_TimingData':
+        case '_reset_DriverList':
+        case '_reset_SessionInfo':
+        case '_reset_TrackStatus':
+        case '_reset_RaceControlMessages':
+          const actualKey = key.replace('_reset_', '');
+          rs[actualKey] = data;
+          break;
         case 'Heartbeat':
         case 'ExtrapolatedClock':
         case 'TrackStatus':
@@ -157,10 +167,12 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
           }
           break;
         case 'CarData.z':
+        case 'CarData':
           rs.CarDataZ = data;
           parseTelemetry(data, prev.driversMap);
           break;
         case 'Position.z':
+        case 'Position':
           rs.PositionZ = data;
           parsePosition(data, prev.driversMap);
           break;
@@ -248,38 +260,78 @@ function parseZData(base64Str: string) {
     }
 }
 
-function parseTelemetry(decoded: any, driversMap: Record<string, DriverState>) {
-   if (decoded && decoded.Entries && decoded.Entries.length > 0) {
-       const latest = decoded.Entries[decoded.Entries.length - 1];
+function parseTelemetry(data: any, driversMap: Record<string, DriverState>) {
+   let entriesList = data?.Entries;
+   
+   if (entriesList && (!Array.isArray(entriesList) && entriesList.z)) {
+       const decomp = parseZData(entriesList.z);
+       if (decomp && Array.isArray(decomp)) {
+           entriesList = decomp;
+       } else if (decomp && decomp.Entries) {
+           entriesList = decomp.Entries;
+       }
+   } else if (data && data.z) {
+       const decomp = parseZData(data.z);
+       if (decomp && Array.isArray(decomp.Entries)) {
+           entriesList = decomp.Entries;
+       }
+   }
+
+   if (Array.isArray(entriesList) && entriesList.length > 0) {
+       const latest = entriesList[entriesList.length - 1];
        if (latest && latest.Cars) {
            Object.keys(latest.Cars).forEach(num => {
                if (driversMap[num] && latest.Cars[num].Channels) {
                    const ch = latest.Cars[num].Channels;
                    const drv = driversMap[num];
-                   drv.telemetry.rpm = ch[0] ?? drv.telemetry.rpm;
-                   drv.telemetry.speed = ch[2] ?? drv.telemetry.speed;
-                   drv.telemetry.gear = ch[3] ?? drv.telemetry.gear;
-                   drv.telemetry.throttle = ch[4] ?? drv.telemetry.throttle;
-                   drv.telemetry.brake = ch[5] ? 100 : 0;
-                   drv.telemetry.drs = ch[45] ?? drv.telemetry.drs;
+                   drv.telemetry = {
+                       ...drv.telemetry,
+                       rpm: ch[0] ?? drv.telemetry.rpm,
+                       speed: ch[2] ?? drv.telemetry.speed,
+                       gear: ch[3] ?? drv.telemetry.gear,
+                       throttle: ch[4] ?? drv.telemetry.throttle,
+                       brake: ch[5] ? 100 : 0,
+                       drs: ch[45] ?? drv.telemetry.drs
+                   };
                }
            });
        }
    }
 }
 
-function parsePosition(decoded: any, driversMap: Record<string, DriverState>) {
-    if (decoded && decoded.Position && decoded.Position.length > 0) {
-        const latest = decoded.Position[decoded.Position.length - 1];
+function parsePosition(data: any, driversMap: Record<string, DriverState>) {
+    let positionList = data?.Position;
+    
+    // Handle compressed position data
+    if (positionList && (!Array.isArray(positionList) && positionList.z)) {
+        const decomp = parseZData(positionList.z);
+        if (decomp && Array.isArray(decomp)) {
+            positionList = decomp;
+        } else if (decomp && decomp.Position) {
+            positionList = decomp.Position;
+        }
+    } else if (data && data.z) {
+        const decomp = parseZData(data.z);
+        if (decomp && Array.isArray(decomp.Position)) {
+            positionList = decomp.Position;
+        }
+    }
+
+    if (Array.isArray(positionList) && positionList.length > 0) {
+        const latest = positionList[positionList.length - 1];
         if (latest && latest.Entries) {
             Object.keys(latest.Entries).forEach(num => {
                 if (driversMap[num]) {
                     const pos = latest.Entries[num];
                     const drv = driversMap[num];
-                    drv.positionData.x = pos.X ?? drv.positionData.x;
-                    drv.positionData.y = pos.Y ?? drv.positionData.y;
-                    drv.positionData.z = pos.Z ?? drv.positionData.z;
-                    if (pos.Status) drv.positionData.status = pos.Status;
+                    // Mutate the nested object so UI updates see it (with Zustand new map)
+                    drv.positionData = {
+                        ...drv.positionData,
+                        x: pos.X !== undefined ? parseFloat(pos.X) : drv.positionData.x,
+                        y: pos.Y !== undefined ? parseFloat(pos.Y) : drv.positionData.y,
+                        z: pos.Z !== undefined ? parseFloat(pos.Z) : drv.positionData.z,
+                        status: pos.Status ?? drv.positionData.status
+                    };
                 }
             });
         }
@@ -318,7 +370,7 @@ export class KineticEngine {
     private intervalId: any = null;
     private reconnectAttempts = 0;
     private reconnectTimeout: any = null;
-    readonly URI = "wss://proxy.cloudflare-eggshell171.workers.dev";
+    readonly URI = window.location.protocol === "https:" ? `wss://${window.location.host}/f1dash-ws` : `ws://${window.location.host}/f1dash-ws`;
 
     connect() {
         if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -328,27 +380,9 @@ export class KineticEngine {
         this.ws = new WebSocket(this.URI);
 
         this.ws.onopen = () => {
-            console.log('KineticEngine: Connected to F1 proxy');
+            console.log('KineticEngine: Connected to F1Dash proxy');
             useKineticStore.getState().setConnected(true);
             this.reconnectAttempts = 0;
-            
-            this.ws?.send(JSON.stringify({
-                H: "Streaming",
-                M: "Subscribe",
-                A: [["Heartbeat", "SessionInfo", "SessionData", "TrackStatus", "DriverList", "RaceControlMessages", "LapCount", "TimingData", "TimingStats", "TimingAppData", "WeatherData", "ExtrapolatedClock", "TeamRadio", "DriverTracker"]],
-                I: 1
-            }));
-
-            setTimeout(() => {
-                if (this.ws?.readyState === WebSocket.OPEN) {
-                    this.ws.send(JSON.stringify({
-                        H: "Streaming",
-                        M: "Subscribe",
-                        A: [["CarData.z", "Position.z"]],
-                        I: 2
-                    }));
-                }
-            }, 2000);
 
             if (this.intervalId === null) {
                 this.intervalId = setInterval(() => this.processQueue(), 100);
@@ -358,29 +392,18 @@ export class KineticEngine {
         this.ws.onmessage = (event) => {
             try {
                 const r = JSON.parse(event.data);
-                if (r.M && Array.isArray(r.M)) {
-                    r.M.forEach((e: any) => {
-                        let key = "unknown";
-                        let val = e;
-                        if (e.M === "feed" && e.A?.length >= 2) {
-                            key = e.A[0];
-                            val = e.A[1];
-                        } else if (e.M) {
-                            key = e.M;
-                            val = e.A ? e.A[0] : e;
-                        }
-
-                        if (typeof key === "string" && key.endsWith(".z") && typeof val === "string") {
-                            const decoded = parseZData(val);
-                            if (!decoded) return;
-                            val = decoded;
-                        }
-
-                        this.enqueueMessage(key, val);
-                    });
-                } else if (r.R) {
-                    useKineticStore.getState().setInitialState(r.R);
-                }
+                const isKeyFrame = r._kf === true;
+                
+                Object.keys(r).forEach(key => {
+                    if (key === '_kf') return;
+                    
+                    if (isKeyFrame && ['TimingData', 'DriverList', 'SessionInfo', 'TrackStatus', 'RaceControlMessages'].includes(key)) {
+                        // Keyframe completely resets these specific states to avoid stale data accumulation
+                        this.enqueueMessage('_reset_' + key, r[key]);
+                    } else {
+                        this.enqueueMessage(key, r[key]);
+                    }
+                });
             } catch (err) {
                 // error parsing, ignore
             }
