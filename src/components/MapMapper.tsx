@@ -77,19 +77,16 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
          if (p.y > maxY) maxY = p.y;
      });
 
-     // Use driver positions ONLY if track path is completely missing
-     if (trackPath.length < 5) {
-         Object.values(driversMap).forEach(d => {
-             const { x, y } = d.positionData;
-             if (typeof x === 'number' && typeof y === 'number' && Math.abs(x) > 0.1 && Math.abs(y) > 0.1 && Math.abs(x) < 50000 && Math.abs(y) < 50000) { 
-                 hasData = true;
-                 if (x < minX) minX = x;
-                 if (x > maxX) maxX = x;
-                 if (y < minY) minY = y;
-                 if (y > maxY) maxY = y;
-             }
-         });
-     }
+     Object.values(driversMap).forEach(d => {
+         const { x, y } = d.positionData;
+         if (x !== 0 && y !== 0) { 
+             hasData = true;
+             if (x < minX) minX = x;
+             if (x > maxX) maxX = x;
+             if (y < minY) minY = y;
+             if (y > maxY) maxY = y;
+         }
+     });
      
      if (!hasData || minX === Infinity) {
          return { minX: -5000, minY: -5000, spanX: 10000, spanY: 10000, hasData: false };
@@ -102,8 +99,6 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
      let startMinY = minY - (paddingY || 500);
      let sx = Math.abs(maxX - minX) + (paddingX || 500) * 2;
      let sy = Math.abs(maxY - minY) + (paddingY || 500) * 2;
-
-     console.log("Calculated Bounds: ", { startMinX, startMinY, sx, sy, minX, maxX, minY, maxY, trackPoints: trackPath.length });
 
      return { minX: startMinX, minY: startMinY, spanX: sx || 5000, spanY: sy || 5000, hasData };
   }, [driversMap, trackPath]);
@@ -182,12 +177,12 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
                                     <RotateCcw size={20} />
                                 </button>
                             </div>
-                            <TransformComponent wrapperClass="w-full h-full z-10" contentClass="w-full h-full">
+                            <TransformComponent wrapperClass="w-full h-full z-10" contentClass="w-full h-full flex items-center justify-center">
                                 <svg 
                                     viewBox={`${minX} ${minY} ${spanX} ${spanY}`} 
-                                    className="w-full h-full opacity-90 cursor-grab active:cursor-grabbing block"
+                                    className="w-full h-full opacity-90 cursor-grab active:cursor-grabbing"
                                     style={{ transform: 'scaleY(-1)' }} // Invert Y axis as F1 telemetry uses y-up instead of SVG y-down
-                                    preserveAspectRatio="meet"
+                                    preserveAspectRatio="xMidYMid meet"
                                 >
                                     {/* Draw Track Path dynamically from historic points */}
                                     <defs>

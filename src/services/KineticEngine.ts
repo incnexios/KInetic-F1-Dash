@@ -45,7 +45,6 @@ export interface RaceState {
   SessionInfo: any;
   SessionData: any;
   TimingData: any;
-  TimingAppData: any;
   TimingStats: any;
   CarDataZ: any;
   PositionZ: any;
@@ -74,10 +73,9 @@ function createEmptyRaceState(): RaceState {
     SessionInfo: null,
     SessionData: null,
     TimingData: { Lines: {}, SessionPart: 0 },
-    TimingAppData: { Lines: {} },
     TimingStats: { Lines: {} },
-    CarDataZ: null,
-    PositionZ: null,
+    CarData: null,
+    Position: null,
     DriverList: {},
     ExtrapolatedClock: null,
     RaceControlMessages: { Messages: [] },
@@ -166,14 +164,12 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
              handleRaceControlPush(data.Messages);
           }
           break;
-        case 'CarData.z':
         case 'CarData':
-          rs.CarDataZ = data;
+          rs.CarData = data;
           parseTelemetry(data, prev.driversMap);
           break;
-        case 'Position.z':
         case 'Position':
-          rs.PositionZ = data;
+          rs.Position = data;
           parsePosition(data, prev.driversMap);
           break;
         default:
@@ -327,9 +323,9 @@ function parsePosition(data: any, driversMap: Record<string, DriverState>) {
                     // Mutate the nested object so UI updates see it (with Zustand new map)
                     drv.positionData = {
                         ...drv.positionData,
-                        x: pos.X !== undefined ? parseFloat(pos.X) : drv.positionData.x,
-                        y: pos.Y !== undefined ? parseFloat(pos.Y) : drv.positionData.y,
-                        z: pos.Z !== undefined ? parseFloat(pos.Z) : drv.positionData.z,
+                        x: pos.X ?? drv.positionData.x,
+                        y: pos.Y ?? drv.positionData.y,
+                        z: pos.Z ?? drv.positionData.z,
                         status: pos.Status ?? drv.positionData.status
                     };
                 }
