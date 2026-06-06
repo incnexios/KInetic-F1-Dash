@@ -17,20 +17,20 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
      let isMounted = true;
      const fetchTrack = async () => {
          try {
-             // Fetch a completed lap to get a clean layout
-             const lapRes = await fetch('https://api.openf1.org/v1/laps?session_key=latest&driver_number=1');
+             // Fetch a completed lap to get a clean layout from any driver
+             const lapRes = await fetch('https://api.openf1.org/v1/laps?session_key=latest');
              if (!lapRes.ok) return;
              const lapsData = await lapRes.json();
              if (!lapsData || lapsData.length < 2) return;
              
              // Find a good complete lap
-             const lap = lapsData.find((l: any) => l.lap_duration && l.lap_duration > 60) || lapsData[1];
-             if (!lap || !lap.date_start || !lap.lap_duration) return;
+             const lap = lapsData.find((l: any) => l.lap_duration && l.lap_duration > 60 && l.lap_duration < 150) || lapsData[1];
+             if (!lap || !lap.date_start || !lap.lap_duration || !lap.driver_number) return;
 
              const startDate = new Date(lap.date_start);
              const endDate = new Date(startDate.getTime() + lap.lap_duration * 1000);
 
-             const res = await fetch(`https://api.openf1.org/v1/location?session_key=latest&driver_number=1&date>=${startDate.toISOString()}&date<=${endDate.toISOString()}`);
+             const res = await fetch(`https://api.openf1.org/v1/location?session_key=latest&driver_number=${lap.driver_number}&date>=${startDate.toISOString()}&date<=${endDate.toISOString()}`);
              if (!res.ok) return;
              const data = await res.json();
              if (data && data.length > 0 && isMounted) {

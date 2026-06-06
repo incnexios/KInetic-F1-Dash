@@ -20,46 +20,28 @@ export function LiveLeaderboard({ selectedDriver, onSelectDriver }: { selectedDr
     return fromData?.driver_season;
   };
 
-  const getTyreColor = (c: string) => {
-      if (!c) return 'bg-white/20';
-      if (c.includes('SOFT') || c === 'S') return 'bg-red-500';
-      if (c.includes('MEDIUM') || c === 'M') return 'bg-yellow-400';
-      if (c.includes('HARD') || c === 'H') return 'bg-blue-400';
-      if (c.includes('INTERMEDIATE') || c === 'I') return 'bg-green-500';
-      if (c.includes('WET') || c === 'W') return 'bg-blue-600';
-      return 'bg-white/50';
+  const renderTyre = (c: string) => {
+      if (!c) return null;
+      let letter = c[0].toUpperCase();
+      let bgColor = 'bg-white/20 text-white';
+      let outlineColor = '';
+      
+      if (c.includes('SOFT') || c === 'S') { bgColor = 'bg-red-500 text-white'; letter = 'S'; }
+      else if (c.includes('MEDIUM') || c === 'M') { bgColor = 'bg-[#f7d627] text-black'; letter = 'M'; }
+      else if (c.includes('HARD') || c === 'H') { bgColor = 'bg-white text-black'; outlineColor = 'border border-black/20'; letter = 'H'; }
+      else if (c.includes('INTERMEDIATE') || c === 'I') { bgColor = 'bg-green-500 text-white'; letter = 'I'; }
+      else if (c.includes('WET') || c === 'W') { bgColor = 'bg-blue-600 text-white'; letter = 'W'; }
+
+      return <span className={cn("w-4 h-4 rounded-[3px] flex items-center justify-center text-[10px] font-bold font-mono", bgColor, outlineColor)}>{letter}</span>;
   };
 
   const timingData = rs.TimingData?.Lines || {};
-  const timingStats = rs.TimingStats?.Lines || {};
-  const overallBestLap = rs.TimingStats?.SessionRecord?.LapTime;
-  const overallBestSectors = rs.TimingStats?.SessionRecord?.Sectors || [];
-
-  const isPurple = (value: string | undefined, index: number = -1) => {
-      if (!value || value === '-') return false;
-      if (index === -1) {
-           return value === overallBestLap;
-      }
-      return value === overallBestSectors[index]?.Value;
-  };
-
-  const getSectorColor = (val: string | undefined, idx: number, stats: any) => {
-      if (!val || val === '-') return 'text-white/50 bg-white/5';
-      if (isPurple(val, idx)) return 'text-white bg-purple-500 border-purple-500';
-      if (stats?.Sectors && stats.Sectors[idx] && stats.Sectors[idx].Value === val) return 'text-white bg-emerald-500 border-emerald-500';
-      return 'text-white bg-yellow-500 border-yellow-500';
-  };
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#181a20] overflow-hidden">
-      <div className="p-3 bg-white/5 border-b border-white/10 flex justify-between items-center shrink-0">
-        <span className="text-xs font-bold uppercase tracking-widest opacity-70">Leaderboard</span>
-      </div>
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Scrollable content */}
+    <div className="flex flex-col h-full w-full bg-[#15151e] overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-           <div className="flex flex-col">
+           <div className="flex flex-col p-1 gap-0.5">
               {sortedDrivers.map(drv => {
                   const isSelected = selectedDriver === drv.racingNumber;
                   const config = getDriverConfig(drv.racingNumber, drv.tla);
@@ -67,87 +49,48 @@ export function LiveLeaderboard({ selectedDriver, onSelectDriver }: { selectedDr
                   
                   const timingAppData = rs.TimingAppData?.Lines?.[drv.racingNumber]?.Stints || [];
                   const tyreDataList = rs.TyreStintSeries?.[drv.racingNumber]?.Stints || timingAppData;
-                  const mockStints = tyreDataList.length > 0 ? tyreDataList.map((t: any) => t.Compound || t.TyreCompound) : [];
+                  const currentTyre = tyreDataList.length > 0 ? (tyreDataList[tyreDataList.length - 1].Compound || tyreDataList[tyreDataList.length - 1].TyreCompound || 'U') : 'U';
                   
                   const timing = timingData[drv.racingNumber] || {};
-                  const stats = timingStats[drv.racingNumber] || {};
                   
-                  const bestLapVal = timing.BestLapTime?.Value || '-';
-                  const lastLapVal = timing.LastLapTime?.Value || '-';
-                  const pbLap = stats?.PersonalBestLapTime?.Value;
-                  
-                  const isAbsoluteFastest = bestLapVal !== '-' && bestLapVal === overallBestLap;
-                  const isPersonalFastest = lastLapVal !== '-' && lastLapVal === pbLap && !isAbsoluteFastest;
-                  
-                  const s1 = timing.Sectors?.['0']?.Value || '';
-                  const s2 = timing.Sectors?.['1']?.Value || '';
-                  const s3 = timing.Sectors?.['2']?.Value || '';
+                  let gapStr = timing.GapToLeader || '';
+                  if (!gapStr && timing.IntervalToPositionAhead && timing.IntervalToPositionAhead.Value) {
+                      gapStr = `+${timing.IntervalToPositionAhead.Value}`;
+                  } else if (drv.position === "1" || !gapStr) {
+                      gapStr = timing.LastLapTime?.Value || 'LAP';
+                  }
+
+                  let positionBg = drv.position === "1" ? "bg-[#e10600] text-white font-bold" : "text-white font-normal";
 
                   return (
                       <div 
                          key={drv.racingNumber}
                          onClick={() => onSelectDriver(drv.racingNumber)}
                          className={cn(
-                            "flex items-stretch border-b border-white/5 cursor-pointer transition-colors hover:bg-white/5 flex-col",
-                            isSelected && "bg-white/10"
+                            "flex items-center h-10 cursor-pointer transition-colors bg-[#111115] mb-[2px]",
+                            isSelected ? "bg-white/10" : "hover:bg-white/5"
                          )}
                       >
-                         {/* Top Row: Info */}
-                         <div className="flex items-center">
-                             <div className="flex flex-col items-center justify-center w-8 shrink-0">
-                                <span className="font-bold text-base leading-none">{drv.position}</span>
-                             </div>
-                             
-                             <div className="flex shrink-0 items-center justify-center py-1">
-                                <div className="w-1 h-8 rounded-full" style={{ backgroundColor: teamColor }}></div>
-                             </div>
-                             
-                             <div className="w-6 shrink-0 flex items-center justify-center ml-2 opacity-80">
-                                 {getDriverNumberUrl(drv.tla) ? (
-                                     <img src={getDriverNumberUrl(drv.tla)} alt={drv.racingNumber} className="h-4 w-auto object-contain" />
-                                 ) : (
-                                     <span className="opacity-50 text-[10px] font-bold">{drv.racingNumber}</span>
-                                 )}
-                             </div>
-                             
-                             <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pl-1 pr-2">
-                                <div className="flex items-center justify-between">
-                                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                      {config?.constructor.constructor_normalized_logo_url && (
-                                          <img src={config.constructor.constructor_normalized_logo_url} className="h-3 w-auto opacity-80" alt="" />
-                                      )}
-                                      <span className="font-bold text-base tracking-tight uppercase text-white truncate">{drv.tla}</span>
-                                   </div>
-                                   <div className="flex gap-0.5 shrink-0 ml-2">
-                                       {mockStints.map((stint: string, i: number) => (
-                                           <div key={i} className={cn("w-2.5 h-1.5 rounded-[1px]", getTyreColor(stint))}></div>
-                                       ))}
-                                   </div>
-                                </div>
-                             </div>
+                         <div className={cn("flex items-center justify-center w-10 shrink-0 h-full font-mono text-lg", positionBg)}>
+                            {drv.position}
                          </div>
                          
-                         {/* Bottom Row: Detailed Times */}
-                         <div className="flex text-[9px] font-mono justify-between px-2 pb-1.5 pt-0.5 bg-black/10">
-                            {/* Sectors */}
-                            <div className="flex gap-1 items-center">
-                               {s1 && <span className={cn("px-1 min-w-[20px] text-center rounded-[2px] border border-transparent", getSectorColor(s1, 0, stats))}>{s1.replace(/\\..*/, '')}</span>}
-                               {s2 && <span className={cn("px-1 min-w-[20px] text-center rounded-[2px] border border-transparent", getSectorColor(s2, 1, stats))}>{s2.replace(/\\..*/, '')}</span>}
-                               {s3 && <span className={cn("px-1 min-w-[20px] text-center rounded-[2px] border border-transparent", getSectorColor(s3, 2, stats))}>{s3.replace(/\\..*/, '')}</span>}
-                            </div>
-                            
-                            {/* Times */}
-                            <div className="flex items-center gap-2 text-right">
-                               <div className="flex flex-col">
-                                  <span className={cn(
-                                     "font-bold leading-tight",
-                                     isAbsoluteFastest ? 'text-purple-400' : (isPersonalFastest ? 'text-emerald-400' : 'text-slate-300')
-                                  )}>
-                                     {lastLapVal}
-                                  </span>
-                                  <span className="text-[8px] opacity-50 shrink-0 leading-[8px]">{timing.GapToLeader || 'LEADER'}</span>
-                               </div>
-                            </div>
+                         <div className="flex items-center justify-center w-12 shrink-0 opacity-90 mix-blend-screen scale-110">
+                            {config?.constructor.constructor_normalized_logo_url && (
+                                <img src={config.constructor.constructor_normalized_logo_url} className="w-7 h-7 object-contain" alt="" />
+                            )}
+                         </div>
+                         
+                         <div className="w-16 flex items-center shrink-0">
+                            <span className="font-bold text-xl tracking-tighter text-white uppercase">{drv.tla}</span>
+                         </div>
+                         
+                         <div className="flex-1 flex items-center justify-end px-2 pr-4 min-w-0">
+                            <span className="font-mono text-lg text-white font-normal tracking-tight">{gapStr}</span>
+                         </div>
+
+                         <div className="w-8 flex items-center justify-center shrink-0 border-l border-white/5 h-6">
+                            {renderTyre(currentTyre)}
                          </div>
                       </div>
                   );

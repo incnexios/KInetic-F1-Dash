@@ -1,5 +1,4 @@
 const { WebSocket } = require('ws');
-const https = require('https');
 
 async function getHub() {
     const res = await fetch('https://livetiming.formula1.com/signalr/negotiate?connectionData=%5B%7B%22name%22%3A%22Streaming%22%7D%5D&clientProtocol=1.5', {
@@ -30,7 +29,7 @@ async function run() {
             console.log("TeamRadio:", str);
         }
         if (str.includes('SessionInfo') && !str.includes('Subscribe')) {
-            console.log("SessionInfo:", str.substring(0, 100)); // Truncate to avoid too much output
+            console.log("SessionInfo:", str.substring(0, 100));
         }
     });
 

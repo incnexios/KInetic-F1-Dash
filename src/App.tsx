@@ -109,8 +109,19 @@ export default function App() {
     setShowAddWidget(false);
   };
 
+  const trackStatus = rs.TrackStatus?.Status || '1';
+  let ambientAppBg = 'bg-[#0f1115]';
+  if (trackStatus === '2' || trackStatus === '4' || trackStatus === '6' || trackStatus === '7') ambientAppBg = 'bg-yellow-900/20';
+  if (trackStatus === '5') ambientAppBg = 'bg-red-900/20';
+
+  let extrapolatedTime = rs.ExtrapolatedClock?.ExtrapolatedClock || rs.ExtrapolatedClock?.Remaining || '00:00';
+  if (extrapolatedTime && extrapolatedTime.includes('T')) {
+      extrapolatedTime = extrapolatedTime.split('T')[1]?.substring(0, 5) || extrapolatedTime;
+  }
+  const currentLap = rs.TimingData?.SessionPart || rs.SessionInfo?.Laps || '-';
+
   return (
-    <div className="min-h-screen text-slate-100 font-sans overflow-hidden flex flex-col bg-[#0b0c10]">
+    <div className={cn("min-h-screen text-slate-100 font-sans overflow-hidden flex flex-col transition-colors duration-1000", ambientAppBg, trackStatus === '5' && "shadow-[inset_0_0_150px_rgba(220,38,38,0.2)]", (trackStatus === '2' || trackStatus === '4' || trackStatus === '6') && "shadow-[inset_0_0_150px_rgba(234,179,8,0.15)]")}>
        <header className="h-16 border-b border-white/10 bg-black/80 backdrop-blur-md flex items-center justify-between px-6 shrink-0 relative z-20 shadow-md">
          <div className="flex items-center gap-4">
            <div className="bg-[#e10600] text-white font-black px-3 py-1 text-xl italic tracking-tighter rounded-sm shadow-[0_0_15px_rgba(225,6,0,0.5)]">KINETIC</div>
@@ -128,8 +139,18 @@ export default function App() {
            </div>
          </div>
          
-         {/* Center: Track Status */}
-         <div className="hidden md:flex flex-1 justify-center">
+         {/* Center: Track Status & Session Clock */}
+         <div className="hidden md:flex flex-1 justify-center items-center gap-6">
+            <div className="flex items-center gap-3 font-mono font-bold text-lg tracking-wider text-white bg-white/5 px-4 py-1.5 rounded-sm border border-white/10">
+                <span>{extrapolatedTime}</span>
+                {currentLap !== '-' && (
+                    <>
+                        <span className="text-white/30 truncate">|</span>
+                        <span>L {currentLap}</span>
+                    </>
+                )}
+            </div>
+
             {rs.TrackStatus?.Status && (
                 <div className={cn(
                     "px-4 py-1.5 rounded-sm border flex items-center gap-2 font-bold uppercase tracking-widest text-xs shadow-lg transition-colors",

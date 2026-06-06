@@ -23,6 +23,15 @@ async function startServer() {
   // Mount it to avoid conflicting with Vite's HMR websocket
   app.use('/f1dash-ws', wsProxy);
 
+  const audioProxy = createProxyMiddleware({
+    target: 'https://livetiming.formula1.com',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/audio-f1': '',
+    },
+  });
+  app.use('/audio-f1', audioProxy);
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

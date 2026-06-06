@@ -8,6 +8,8 @@ import { ChampionshipStandings } from './components/ChampionshipStandings';
 import { WeatherConditions } from './components/WeatherConditions';
 import { TyreStints } from './components/TyreStints';
 import { StreamsWidget } from './components/StreamsWidget';
+import { TeamRadioWidget } from './components/TeamRadioWidget';
+import { LapByLapWidget } from './components/LapByLapWidget';
 
 export const WidgetRegistry = {
     LiveLeaderboard,
@@ -20,4 +22,6 @@ export const WidgetRegistry = {
     CustomChart,
     ChampionshipStandings,
     WeatherConditions,
+    TeamRadioWidget,
+    LapByLapWidget,
 };

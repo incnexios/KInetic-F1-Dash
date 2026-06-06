@@ -54,6 +54,7 @@ export interface RaceState {
   TrackStatus: any;
   TyreStintSeries: any;
   WeatherData: any;
+  TeamRadio: { Captures: any[] };
 }
 
 export interface KineticStore {
@@ -82,6 +83,7 @@ function createEmptyRaceState(): RaceState {
     TrackStatus: null,
     TyreStintSeries: null,
     WeatherData: null,
+    TeamRadio: { Captures: [] },
   };
 }
 
@@ -162,6 +164,15 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
                  Object.values(data.Messages).forEach(m => rs[key].Messages.push(m));
              }
              handleRaceControlPush(data.Messages);
+          }
+          break;
+        case 'TeamRadio':
+          if (data.Captures) {
+             if (Array.isArray(data.Captures)) {
+                 rs[key].Captures.push(...data.Captures);
+             } else {
+                 Object.values(data.Captures).forEach(m => rs[key].Captures.push(m));
+             }
           }
           break;
         case 'CarData':
