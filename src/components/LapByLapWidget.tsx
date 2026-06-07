@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
 import { AlignLeft, Clock } from 'lucide-react';
+import { Tweet } from 'react-tweet';
 
 export function LapByLapWidget({ id }: { id: string }) {
     const [news, setNews] = useState<any[]>([]);
@@ -9,7 +10,8 @@ export function LapByLapWidget({ id }: { id: string }) {
         let isMounted = true;
         const fetchNews = async () => {
             try {
-                const res = await fetch('https://cdn.monterosa.cloud/events/76/76927826-b61c-484d-8470-effc4f42260d/history.json');
+                const url = import.meta.env.VITE_LAP_BY_LAP_URL || 'https://cdn.monterosa.cloud/events/76/76927826-b61c-484d-8470-effc4f42260d/history.json';
+                const res = await fetch(url);
                 const data = await res.json();
                 if (data && data.timeline && isMounted) {
                     setNews(data.timeline.reverse());
@@ -40,6 +42,20 @@ export function LapByLapWidget({ id }: { id: string }) {
                      <audio src={audioSrc} controls preload="metadata" className="w-full h-8 grayscale opacity-80" />
                  </div>
              )
+        }
+        
+        if (type === 'social-element' && fields.socialPlatform === 'twitter' && fields.url) {
+            const match = fields.url.match(/status\/(\d+)/);
+            if (match && match[1]) {
+                return (
+                    <div className="flex flex-col gap-2 relative tweet-container light">
+                        <div className="hidden">{/* We want the dark theme, actually react-tweet automatically detects standard mode but we might need to scope styles or just wrap it */}</div>
+                        <div className="dark">
+                           <Tweet id={match[1]} />
+                        </div>
+                    </div>
+                )
+            }
         }
 
         return (

@@ -94,6 +94,18 @@ export function LiveTimingTable({ selectedDriver, onSelectDriver }: { selectedDr
                      const lastLapVal = d.timing.LastLapTime?.Value || '-';
                      const pbLap = d.stats?.PersonalBestLapTime?.Value;
                      
+                     let gapStr = d.timing.GapToLeader || '-';
+                     let intStr = d.timing.IntervalToPositionAhead?.Value || '-';
+                     if (gapStr === '-' && d.timing.Stats && Array.isArray(d.timing.Stats)) {
+                         for (let i = d.timing.Stats.length - 1; i >= 0; i--) {
+                             if (d.timing.Stats[i] && d.timing.Stats[i].TimeDiffToFastest) {
+                                 gapStr = d.timing.Stats[i].TimeDiffToFastest;
+                                 intStr = d.timing.Stats[i].TimeDifftoPositionAhead || intStr;
+                                 break;
+                             }
+                         }
+                     }
+
                      const isAbsoluteFastest = bestLapVal !== '-' && bestLapVal === overallBestLap;
                      const isPersonalFastest = lastLapVal !== '-' && lastLapVal === pbLap && !isAbsoluteFastest;
 
@@ -165,8 +177,8 @@ export function LiveTimingTable({ selectedDriver, onSelectDriver }: { selectedDr
                              <div className={cn("flex-1 min-w-[50px] text-right", isAbsoluteFastest ? 'text-purple-500 font-black' : (isPersonalFastest ? 'text-emerald-400 font-bold' : 'text-slate-200'))}>{lastLapVal}</div>
                              <div className={cn("flex-1 min-w-[50px] text-right", isAbsoluteFastest ? 'text-purple-500 font-black' : 'text-slate-300 font-bold')}>{bestLapVal}</div>
                              
-                             <div className="w-16 shrink-0 text-right opacity-70">{isOut ? <span className="text-red-500 italic">OUT</span> : d.timing.InPit ? <span className="text-blue-400 italic">PIT</span> : (d.timing.GapToLeader || '-')}</div>
-                             <div className="w-16 shrink-0 text-right opacity-70">{isOut ? '' : (d.timing.IntervalToPositionAhead?.Value || '-')}</div>
+                             <div className="w-16 shrink-0 text-right opacity-70">{isOut ? <span className="text-red-500 italic">OUT</span> : d.timing.InPit ? <span className="text-blue-400 italic">PIT</span> : gapStr}</div>
+                             <div className="w-16 shrink-0 text-right opacity-70">{isOut ? '' : intStr}</div>
                              <div className="w-8 shrink-0 text-center ml-2 opacity-50">{d.timing.NumberOfPitStops || 0}</div>
                          </div>
                      );

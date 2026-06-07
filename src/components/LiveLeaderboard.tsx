@@ -53,11 +53,22 @@ export function LiveLeaderboard({ selectedDriver, onSelectDriver }: { selectedDr
                   
                   const timing = timingData[drv.racingNumber] || {};
                   
-                  let gapStr = timing.GapToLeader || '';
-                  if (!gapStr && timing.IntervalToPositionAhead && timing.IntervalToPositionAhead.Value) {
-                      gapStr = `+${timing.IntervalToPositionAhead.Value}`;
-                  } else if (drv.position === "1" || !gapStr) {
-                      gapStr = timing.LastLapTime?.Value || 'LAP';
+                  let gapStr = '';
+                  if (drv.position === "1") {
+                      gapStr = 'Interval';
+                  } else {
+                      if (timing.GapToLeader) {
+                          gapStr = timing.GapToLeader;
+                      } else if (timing.Stats && Array.isArray(timing.Stats)) {
+                          for (let i = timing.Stats.length - 1; i >= 0; i--) {
+                              if (timing.Stats[i] && timing.Stats[i].TimeDiffToFastest) {
+                                  gapStr = timing.Stats[i].TimeDiffToFastest;
+                                  break;
+                              }
+                          }
+                      } else if (timing.IntervalToPositionAhead && timing.IntervalToPositionAhead.Value) {
+                          gapStr = `+${timing.IntervalToPositionAhead.Value}`;
+                      }
                   }
 
                   let positionBg = drv.position === "1" ? "bg-[#e10600] text-white font-bold" : "text-white font-normal";
