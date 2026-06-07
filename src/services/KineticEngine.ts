@@ -377,7 +377,7 @@ export class KineticEngine {
     private intervalId: any = null;
     private reconnectAttempts = 0;
     private reconnectTimeout: any = null;
-    readonly URI = window.location.protocol === "https:" ? `wss://${window.location.host}/f1dash-ws` : `ws://${window.location.host}/f1dash-ws`;
+    readonly URI = 'wss://f1dash.net/ws';
 
     connect() {
         if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -387,7 +387,7 @@ export class KineticEngine {
         this.ws = new WebSocket(this.URI);
 
         this.ws.onopen = () => {
-            console.log('KineticEngine: Connected to F1Dash proxy');
+            console.log('KineticEngine: Connected to F1Dash directly');
             useKineticStore.getState().setConnected(true);
             this.reconnectAttempts = 0;
 

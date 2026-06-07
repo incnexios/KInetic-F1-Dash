@@ -42,7 +42,7 @@ export function TeamRadioWidget({ id }: { id: string }) {
                                     <span className="text-xs text-white/40 font-mono ml-auto">{timeStr}</span>
                                 </div>
                                 <div className="p-3">
-                                   <audio src={`https://livetiming.formula1.com/static/${sessionPath}${sessionPath.endsWith('/') ? '' : '/'}${cap.Path}`} controls className="w-full h-8 grayscale opacity-80" />
+                                   <audio src={`https://livetiming.formula1.com/static/${sessionPath}${sessionPath.endsWith('/') ? '' : '/'}${cap.Path}`} controls preload="metadata" className="w-full h-8 grayscale opacity-80" />
                                 </div>
                             </div>
                         )

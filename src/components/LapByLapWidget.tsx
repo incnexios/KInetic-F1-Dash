@@ -37,7 +37,7 @@ export function LapByLapWidget({ id }: { id: string }) {
              return (
                  <div className="flex flex-col gap-2">
                      <span className="font-bold text-sm tracking-tight text-[#e10600]">{fields.title || 'TEAM RADIO'}</span>
-                     <audio src={audioSrc} controls className="w-full h-8 grayscale opacity-80" />
+                     <audio src={audioSrc} controls preload="metadata" className="w-full h-8 grayscale opacity-80" />
                  </div>
              )
         }
