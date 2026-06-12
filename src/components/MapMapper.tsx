@@ -18,9 +18,9 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
      const fetchTrack = async () => {
          try {
              // Fetch a completed lap to get a clean layout from any driver
-             const lapRes = await fetch('https://api.openf1.org/v1/laps?session_key=latest').catch(() => null);
-             if (!lapRes || !lapRes.ok) return;
-             const lapsData = await lapRes.json().catch(() => null);
+             const lapRes = await fetch('https://api.openf1.org/v1/laps?session_key=latest');
+             if (!lapRes.ok) return;
+             const lapsData = await lapRes.json();
              if (!lapsData || lapsData.length < 2) return;
              
              // Find a good complete lap
@@ -30,9 +30,9 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
              const startDate = new Date(lap.date_start);
              const endDate = new Date(startDate.getTime() + lap.lap_duration * 1000);
 
-             const res = await fetch(`https://api.openf1.org/v1/location?session_key=latest&driver_number=${lap.driver_number}&date>=${startDate.toISOString()}&date<=${endDate.toISOString()}`).catch(() => null);
-             if (!res || !res.ok) return;
-             const data = await res.json().catch(() => null);
+             const res = await fetch(`https://api.openf1.org/v1/location?session_key=latest&driver_number=${lap.driver_number}&date>=${startDate.toISOString()}&date<=${endDate.toISOString()}`);
+             if (!res.ok) return;
+             const data = await res.json();
              if (data && data.length > 0 && isMounted) {
                  const newPath: {x: number, y: number}[] = [];
                  for (let i = 0; i < data.length; i += 2) { // Less subsampling for smoother curve
@@ -43,7 +43,7 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
                  setTrackPath(newPath);
              }
          } catch (e) {
-             // Silently fail if OpenF1 is unavailable, fallback relies on Live GPS
+             // Silently fail if OpenF1 is unavailable
          }
      };
      fetchTrack();

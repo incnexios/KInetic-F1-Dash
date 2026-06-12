@@ -159,18 +159,13 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
           rs[key] = deepMerge(rs[key] || {}, data);
           break;
         case 'RaceControlMessages':
-          let msgs = data.Messages || data;
-          if (msgs) {
-             if (Array.isArray(msgs)) {
-                 rs[key].Messages.push(...msgs);
+          if (data.Messages) {
+             if (Array.isArray(data.Messages)) {
+                 rs[key].Messages.push(...data.Messages);
              } else {
-                 Object.values(msgs).forEach(m => rs[key].Messages.push(m));
+                 Object.values(data.Messages).forEach(m => rs[key].Messages.push(m));
              }
-             // Deduplicate
-             const unique = new Map();
-             rs[key].Messages.forEach((m: any) => unique.set(m.Utc + m.Message, m));
-             rs[key].Messages = Array.from(unique.values()).sort((a: any, b: any) => a.Utc > b.Utc ? 1 : -1);
-             handleRaceControlPush(msgs);
+             handleRaceControlPush(data.Messages);
           }
           break;
         case 'TeamRadio':
@@ -184,12 +179,10 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
           break;
         case 'CarData':
           rs.CarData = data;
-          console.log('KineticEngine: Received CarData');
           parseTelemetry(data, prev.driversMap);
           break;
         case 'Position':
           rs.Position = data;
-          console.log('KineticEngine: Received Position');
           parsePosition(data, prev.driversMap);
           break;
         default:
@@ -300,12 +293,10 @@ function parsePosition(data: any, driversMap: Record<string, DriverState>) {
 
     if (Array.isArray(positionList) && positionList.length > 0) {
         const latest = positionList[positionList.length - 1];
-        if (latest && latest.Cars) {
-            let sampleCar = Object.keys(latest.Cars)[0];
-            if (sampleCar) console.log('KineticEngine: Parsing Cars Position for ' + sampleCar, latest.Cars[sampleCar]);
-            Object.keys(latest.Cars).forEach(num => {
+        if (latest && latest.Entries) {
+            Object.keys(latest.Entries).forEach(num => {
                 if (driversMap[num]) {
-                    const pos = latest.Cars[num];
+                    const pos = latest.Entries[num];
                     const drv = driversMap[num];
                     drv.positionData = {
                         ...drv.positionData,

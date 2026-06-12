@@ -55,7 +55,8 @@ export function TyreStints({ selectedDriver, onSelectDriver }: { selectedDriver:
                       const inPit = drv.inPit;
                       const timing = timingData[drv.racingNumber] || {};
                       
-                      const stints = tyreDataSeries[drv.racingNumber]?.Stints || timingAppData[drv.racingNumber]?.Stints || [];
+                      const rawStints = tyreDataSeries[drv.racingNumber]?.Stints || timingAppData[drv.racingNumber]?.Stints || [];
+                      const stints = Array.isArray(rawStints) ? rawStints : (typeof rawStints === 'object' && rawStints !== null ? Object.values(rawStints) : []);
                       const currentStint = stints.length > 0 ? stints[stints.length - 1] : null;
                       const currentTyre = currentStint ? (currentStint.Compound || currentStint.TyreCompound) : '';
                       const currentTyreAge = (currentStint?.TotalLaps) || 0; 
