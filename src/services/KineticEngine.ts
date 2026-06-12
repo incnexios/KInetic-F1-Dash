@@ -46,8 +46,9 @@ export interface RaceState {
   SessionData: any;
   TimingData: any;
   TimingStats: any;
-  CarDataZ: any;
-  PositionZ: any;
+  TimingAppData: any;
+  CarData: any;
+  Position: any;
   DriverList: Record<string, any>;
   ExtrapolatedClock: any;
   RaceControlMessages: { Messages: any[] };
@@ -75,6 +76,7 @@ function createEmptyRaceState(): RaceState {
     SessionData: null,
     TimingData: { Lines: {}, SessionPart: 0 },
     TimingStats: { Lines: {} },
+    TimingAppData: { Lines: {} },
     CarData: null,
     Position: null,
     DriverList: {},
@@ -157,13 +159,18 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
           rs[key] = deepMerge(rs[key] || {}, data);
           break;
         case 'RaceControlMessages':
-          if (data.Messages) {
-             if (Array.isArray(data.Messages)) {
-                 rs[key].Messages.push(...data.Messages);
+          let msgs = data.Messages || data;
+          if (msgs) {
+             if (Array.isArray(msgs)) {
+                 rs[key].Messages.push(...msgs);
              } else {
-                 Object.values(data.Messages).forEach(m => rs[key].Messages.push(m));
+                 Object.values(msgs).forEach(m => rs[key].Messages.push(m));
              }
-             handleRaceControlPush(data.Messages);
+             // Deduplicate
+             const unique = new Map();
+             rs[key].Messages.forEach((m: any) => unique.set(m.Utc + m.Message, m));
+             rs[key].Messages = Array.from(unique.values()).sort((a: any, b: any) => a.Utc > b.Utc ? 1 : -1);
+             handleRaceControlPush(msgs);
           }
           break;
         case 'TeamRadio':
@@ -177,10 +184,12 @@ export const useKineticStore = create<KineticStore>((set, get) => ({
           break;
         case 'CarData':
           rs.CarData = data;
+          console.log('KineticEngine: Received CarData');
           parseTelemetry(data, prev.driversMap);
           break;
         case 'Position':
           rs.Position = data;
+          console.log('KineticEngine: Received Position');
           parsePosition(data, prev.driversMap);
           break;
         default:
@@ -255,35 +264,9 @@ function computeDriversMap(raceState: RaceState, currentMap: Record<string, Driv
   return drivers;
 }
 
-function parseZData(base64Str: string) {
-    try {
-        const strData = atob(base64Str);
-        const charData = strData.split('').map((x) => x.charCodeAt(0));
-        const binData = new Uint8Array(charData);
-        const data = pako.inflateRaw(binData, { to: 'string' });
-        return JSON.parse(data);
-    } catch(e) {
-        return null;
-    }
-}
-
 function parseTelemetry(data: any, driversMap: Record<string, DriverState>) {
    let entriesList = data?.Entries;
    
-   if (entriesList && (!Array.isArray(entriesList) && entriesList.z)) {
-       const decomp = parseZData(entriesList.z);
-       if (decomp && Array.isArray(decomp)) {
-           entriesList = decomp;
-       } else if (decomp && decomp.Entries) {
-           entriesList = decomp.Entries;
-       }
-   } else if (data && data.z) {
-       const decomp = parseZData(data.z);
-       if (decomp && Array.isArray(decomp.Entries)) {
-           entriesList = decomp.Entries;
-       }
-   }
-
    if (Array.isArray(entriesList) && entriesList.length > 0) {
        const latest = entriesList[entriesList.length - 1];
        if (latest && latest.Cars) {
@@ -309,29 +292,21 @@ function parseTelemetry(data: any, driversMap: Record<string, DriverState>) {
 function parsePosition(data: any, driversMap: Record<string, DriverState>) {
     let positionList = data?.Position;
     
-    // Handle compressed position data
-    if (positionList && (!Array.isArray(positionList) && positionList.z)) {
-        const decomp = parseZData(positionList.z);
-        if (decomp && Array.isArray(decomp)) {
-            positionList = decomp;
-        } else if (decomp && decomp.Position) {
-            positionList = decomp.Position;
-        }
-    } else if (data && data.z) {
-        const decomp = parseZData(data.z);
-        if (decomp && Array.isArray(decomp.Position)) {
-            positionList = decomp.Position;
-        }
+    if (!positionList && Array.isArray(data)) {
+         positionList = data;
+    } else if (!positionList && data?.Entries) {
+         positionList = data.Entries;
     }
 
     if (Array.isArray(positionList) && positionList.length > 0) {
         const latest = positionList[positionList.length - 1];
-        if (latest && latest.Entries) {
-            Object.keys(latest.Entries).forEach(num => {
+        if (latest && latest.Cars) {
+            let sampleCar = Object.keys(latest.Cars)[0];
+            if (sampleCar) console.log('KineticEngine: Parsing Cars Position for ' + sampleCar, latest.Cars[sampleCar]);
+            Object.keys(latest.Cars).forEach(num => {
                 if (driversMap[num]) {
-                    const pos = latest.Entries[num];
+                    const pos = latest.Cars[num];
                     const drv = driversMap[num];
-                    // Mutate the nested object so UI updates see it (with Zustand new map)
                     drv.positionData = {
                         ...drv.positionData,
                         x: pos.X ?? drv.positionData.x,
@@ -377,7 +352,7 @@ export class KineticEngine {
     private intervalId: any = null;
     private reconnectAttempts = 0;
     private reconnectTimeout: any = null;
-    readonly URI = 'wss://f1dash.net/ws';
+    readonly URI = 'wss://proxy.cloudflare-eggshell171.workers.dev';
 
     connect() {
         if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -387,32 +362,62 @@ export class KineticEngine {
         this.ws = new WebSocket(this.URI);
 
         this.ws.onopen = () => {
-            console.log('KineticEngine: Connected to F1Dash directly');
+            console.log('KineticEngine: Connected');
             useKineticStore.getState().setConnected(true);
             this.reconnectAttempts = 0;
 
+            this.ws?.send(JSON.stringify({protocol:'json',version:1}) + '\x1e');
+            this.ws?.send(JSON.stringify({
+                type:1,
+                target:'Subscribe',
+                arguments:[[
+                    'Heartbeat', 'SessionInfo', 'SessionData',
+                    'TrackStatus', 'DriverList', 'RaceControlMessages',
+                    'LapCount', 'TimingData', 'TimingStats',
+                    'TimingAppData', 'WeatherData', 'ExtrapolatedClock',
+                    'TeamRadio', 'DriverTracker'
+                ]],
+                invocationId:'1'
+            }) + '\x1e');
+
+            setTimeout(() => {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type:1,
+                        target:'Subscribe',
+                        arguments:[['CarData.z','Position.z']],
+                        invocationId:'2'
+                    }) + '\x1e');
+                }
+            }, 2000);
+
             if (this.intervalId === null) {
-                this.intervalId = setInterval(() => this.processQueue(), 100);
+                this.intervalId = setInterval(() => this.processQueue(), 50);
             }
         };
 
-        this.ws.onmessage = (event) => {
-            try {
-                const r = JSON.parse(event.data);
-                const isKeyFrame = r._kf === true;
-                
-                Object.keys(r).forEach(key => {
-                    if (key === '_kf') return;
-                    
-                    if (isKeyFrame && ['TimingData', 'DriverList', 'SessionInfo', 'TrackStatus', 'RaceControlMessages'].includes(key)) {
-                        // Keyframe completely resets these specific states to avoid stale data accumulation
-                        this.enqueueMessage('_reset_' + key, r[key]);
-                    } else {
-                        this.enqueueMessage(key, r[key]);
+        this.ws.onmessage = ({data}) => {
+            for (const frame of data.split('\x1e').filter(Boolean)) {
+                try {
+                    const msg = JSON.parse(frame);
+                    if (msg.type === 3 && msg.result) {
+                        const state = useKineticStore.getState().raceState;
+                        const newState = { ...state };
+                        Object.keys(msg.result).forEach(key => {
+                             newState[key as keyof RaceState] = msg.result[key];
+                        });
+                        useKineticStore.getState().setInitialState(newState);
+                    } else if (msg.type === 1 && msg.target === 'feed') {
+                        let [topic, payload] = msg.arguments;
+                        if (topic && topic.endsWith('.z')) {
+                            payload = this.decompress(payload);
+                            topic = topic.replace('.z', '');
+                        }
+                        this.enqueueMessage(topic, payload);
                     }
-                });
-            } catch (err) {
-                // error parsing, ignore
+                } catch (err) {
+                    // error parsing, ignore
+                }
             }
         };
 
@@ -426,7 +431,7 @@ export class KineticEngine {
             
             if (this.reconnectAttempts < 5) {
                 this.reconnectAttempts += 1;
-                const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
+                const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Max 30s as per instructions
                 this.reconnectTimeout = setTimeout(() => this.connect(), delay);
             }
         };
@@ -434,6 +439,16 @@ export class KineticEngine {
         this.ws.onerror = () => {
            // handled by onclose
         };
+    }
+
+    private decompress(b64: string) {
+        const bin = atob(b64);
+        const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+        try {
+            return JSON.parse(new TextDecoder().decode(pako.inflateRaw(bytes)));
+        } catch {
+            return JSON.parse(new TextDecoder().decode(pako.inflate(bytes)));
+        }
     }
 
     private enqueueMessage(key: string, data: any) {

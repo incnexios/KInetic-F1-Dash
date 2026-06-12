@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { cn } from '../lib/utils';
 import { useKineticStore } from '../services/KineticEngine';
 import { Volume2 } from 'lucide-react';
-import { ALL_TEAMS } from '../constants/circuits';
 
 export function TeamRadioWidget({ id }: { id: string }) {
     const radioCaptures = useKineticStore(state => state.raceState.TeamRadio?.Captures || []);

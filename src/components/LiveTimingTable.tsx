@@ -3,7 +3,7 @@ import { useKineticStore } from '../services/KineticEngine';
 import { cn } from '../lib/utils';
 import { DRIVER_DATA, getDriverNumberUrl } from '../constants/driverData';
 
-export function LiveTimingTable({ selectedDriver, onSelectDriver }: { selectedDriver: string | null, onSelectDriver: (d: string) => void }) {
+export function LiveTimingTable({ selectedDriver, onSelectDriver, id }: { selectedDriver: string | null, onSelectDriver: (d: string) => void, id?: string }) {
     const rs = useKineticStore(state => state.raceState);
     const sessionType = rs.SessionInfo?.Type || 'Race';
 

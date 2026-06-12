@@ -10,7 +10,7 @@ export function LapByLapWidget({ id }: { id: string }) {
         let isMounted = true;
         const fetchNews = async () => {
             try {
-                const url = import.meta.env.VITE_LAP_BY_LAP_URL || 'https://cdn.monterosa.cloud/events/76/76927826-b61c-484d-8470-effc4f42260d/history.json';
+                const url = (import.meta as any).env?.VITE_LAP_BY_LAP_URL || 'https://cdn.monterosa.cloud/events/76/76927826-b61c-484d-8470-effc4f42260d/history.json';
                 const res = await fetch(url);
                 const data = await res.json();
                 if (data && data.timeline && isMounted) {

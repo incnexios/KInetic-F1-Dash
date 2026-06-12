@@ -245,7 +245,7 @@ export default function App() {
                          )}
                          <div className="flex-1 h-full w-full relative overflow-hidden flex flex-col">
                             {WidgetComponent ? (
-                                <WidgetComponent selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
+                                <WidgetComponent selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} id={widget.id} />
                             ) : (
                                 <div className="p-4 text-white/50 flex items-center justify-center h-full">Unknown Widget Type</div>
                             )}
