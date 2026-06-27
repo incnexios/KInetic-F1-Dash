@@ -6,7 +6,7 @@ export function StreamsWidget() {
     const [quality, setQuality] = useState<'SD' | 'HD'>('SD');
 
     const urls = {
-        SD: 'https://www.youtube.com/live/rlJ9XyaOv0w?si=NPY3i3Ll2P35MMmH',
+        SD: 'https://www.youtube.com/embed/rlJ9XyaOv0w?rel=0',
         HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1',
         HD1: 'https://gooz.aapmains.net/new-stream-embed/52517?ad=111',
         HD2: 'https://videocdn-4726.website/shopping2/?channel_id=sky_sport_f1_uk'
