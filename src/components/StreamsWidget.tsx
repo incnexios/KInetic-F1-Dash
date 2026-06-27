@@ -6,8 +6,9 @@ export function StreamsWidget() {
     const [quality, setQuality] = useState<'SD' | 'HD'>('SD');
 
     const urls = {
-        SD: 'https://streamcrichd.com/update/skyf1.php',
-        HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1'
+        SD: 'https://www.youtube.com/live/rlJ9XyaOv0w?si=NPY3i3Ll2P35MMmH',
+        HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1',
+        HD1: 'https://videocdn-4726.website/shopping2/?channel_id=sky_sport_f1_uk'
     };
 
     return (
@@ -22,7 +23,7 @@ export function StreamsWidget() {
                         className={cn("px-3 py-1 text-[10px] font-bold rounded transition-colors", quality === 'SD' ? "bg-red-600 text-white" : "text-white/50 hover:bg-white/10")}
                         onClick={() => setQuality('SD')}
                     >
-                        SD
+                        Test
                     </button>
                     <button 
                         className={cn("px-3 py-1 text-[10px] font-bold rounded transition-colors", quality === 'HD' ? "bg-red-600 text-white" : "text-white/50 hover:bg-white/10")}
@@ -30,7 +31,13 @@ export function StreamsWidget() {
                     >
                         HD
                     </button>
-                </div>
+                                        <button 
+                        className={cn("px-3 py-1 text-[10px] font-bold rounded transition-colors", quality === 'HD1' ? "bg-red-600 text-white" : "text-white/50 hover:bg-white/10")}
+                        onClick={() => setQuality('HD1')}
+                    >
+                        HD1
+                    </button>
+
             </div>
             
             <div className="flex-1 w-full h-full bg-black flex items-center justify-center">
