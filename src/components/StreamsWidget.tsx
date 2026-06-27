@@ -7,7 +7,9 @@ export function StreamsWidget() {
 
     const urls = {
         SD: '',
-        HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1'
+        HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1',
+        HD1: 'https://gooz.aapmains.net/new-stream-embed/52517?ad=111',
+        HD2: 'https://videocdn-4726.website/shopping2/?channel_id=sky_sport_f1_uk'
     };
 
     return (
