@@ -32,6 +32,18 @@ export function StreamsWidget() {
                     >
                         HD
                     </button>
+                                        <button 
+                        className={cn("px-3 py-1 text-[10px] font-bold rounded transition-colors", quality === 'HD1' ? "bg-red-600 text-white" : "text-white/50 hover:bg-white/10")}
+                        onClick={() => setQuality('HD1')}
+                    >
+                        HD1
+                    </button>
+                                        <button 
+                        className={cn("px-3 py-1 text-[10px] font-bold rounded transition-colors", quality === 'HD2' ? "bg-red-600 text-white" : "text-white/50 hover:bg-white/10")}
+                        onClick={() => setQuality('HD2')}
+                    >
+                        HD2
+                    </button>
                 </div>
             </div>
             
