@@ -6,7 +6,7 @@ export function StreamsWidget() {
     const [quality, setQuality] = useState<'SD' | 'HD'>('SD');
 
     const urls = {
-        SD: 'https://streamcrichd.com/update/skyf1.php',
+        SD: '',
         HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1'
     };
 
