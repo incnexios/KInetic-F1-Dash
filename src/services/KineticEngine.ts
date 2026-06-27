@@ -56,6 +56,7 @@ export interface RaceState {
   TyreStintSeries: any;
   WeatherData: any;
   TeamRadio: { Captures: any[] };
+  ReferenceTrack?: {x: number, y: number}[];
 }
 
 export interface KineticStore {
@@ -339,6 +340,8 @@ function showNotification(title: string, body: string) {
 
 export class KineticEngine {
     private ws: WebSocket | null = null;
+    private sse: EventSource | null = null;
+    private telTimer: any = null;
     private queue: { timestamp: number, key: string, data: any }[] = [];
     private intervalId: any = null;
     private reconnectAttempts = 0;
@@ -371,20 +374,14 @@ export class KineticEngine {
                 invocationId:'1'
             }) + '\x1e');
 
-            setTimeout(() => {
-                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    this.ws.send(JSON.stringify({
-                        type:1,
-                        target:'Subscribe',
-                        arguments:[['CarData.z','Position.z']],
-                        invocationId:'2'
-                    }) + '\x1e');
-                }
-            }, 2000);
+            // Removed CarData.z and Position.z subscription
 
             if (this.intervalId === null) {
                 this.intervalId = setInterval(() => this.processQueue(), 50);
             }
+            
+            // Connect to F1 Insights proxy for map and telemetry
+            this.connectF1Insights();
         };
 
         this.ws.onmessage = ({data}) => {
@@ -420,6 +417,8 @@ export class KineticEngine {
                 this.intervalId = null;
             }
             
+            this.disconnectF1Insights();
+            
             if (this.reconnectAttempts < 5) {
                 this.reconnectAttempts += 1;
                 const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Max 30s as per instructions
@@ -430,6 +429,96 @@ export class KineticEngine {
         this.ws.onerror = () => {
            // handled by onclose
         };
+    }
+
+    private connectF1Insights() {
+        if (this.sse) this.sse.close();
+        
+        this.sse = new EventSource('/api/f1insights/stream');
+        
+        this.sse.onmessage = (e) => {
+            if (!e.data || e.data.startsWith(':')) return;
+            try {
+                const data = JSON.parse(e.data);
+                
+                if (data.positions) {
+                    const store = useKineticStore.getState();
+                    
+                    if (data.positions.referenceTrack && data.positions.referenceTrack.length > 0) {
+                         const track = data.positions.referenceTrack.map((p: any) => ({ x: p.x, y: p.y }));
+                         useKineticStore.setState((prev) => ({
+                             raceState: { ...prev.raceState, ReferenceTrack: track }
+                         } as any));
+                    }
+                    
+                    if (data.positions.positions) {
+                         useKineticStore.setState((prev) => {
+                             const newDrivers = { ...prev.driversMap };
+                             data.positions.positions.forEach((p: any) => {
+                                 if (newDrivers[p.driverNumber]) {
+                                     newDrivers[p.driverNumber] = {
+                                         ...newDrivers[p.driverNumber],
+                                         positionData: { x: p.x, y: p.y, z: p.z || 0 },
+                                         inPit: p.inPit
+                                     };
+                                 }
+                             });
+                             return { driversMap: newDrivers };
+                         });
+                    }
+                }
+            } catch (err) {
+                console.warn('KineticEngine SSE Parse Error:', err);
+            }
+        };
+        
+        this.telTimer = setInterval(() => this.fetchTelemetry(), 1000);
+    }
+    
+    private async fetchTelemetry() {
+        const driversMap = useKineticStore.getState().driversMap;
+        const drivers = Object.keys(driversMap);
+        if (drivers.length === 0) return;
+        
+        try {
+            const res = await fetch(`/api/f1insights/telemetry?drivers=${drivers.join(',')}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            useKineticStore.setState((prev) => {
+                const newDrivers = { ...prev.driversMap };
+                Object.keys(data).forEach((num) => {
+                     const cd = data[num];
+                     if (newDrivers[num] && cd) {
+                         newDrivers[num] = {
+                             ...newDrivers[num],
+                             telemetry: {
+                                 rpm: cd.rpm ?? newDrivers[num].telemetry.rpm,
+                                 speed: cd.speed ?? newDrivers[num].telemetry.speed,
+                                 gear: cd.gear ?? newDrivers[num].telemetry.gear,
+                                 throttle: cd.throttle ?? newDrivers[num].telemetry.throttle,
+                                 brake: cd.brake ?? newDrivers[num].telemetry.brake,
+                                 drs: cd.drs ?? newDrivers[num].telemetry.drs
+                             }
+                         };
+                     }
+                });
+                return { driversMap: newDrivers };
+            });
+        } catch (err) {
+            // ignore
+        }
+    }
+
+    private disconnectF1Insights() {
+        if (this.sse) {
+            this.sse.close();
+            this.sse = null;
+        }
+        if (this.telTimer) {
+            clearInterval(this.telTimer);
+            this.telTimer = null;
+        }
     }
 
     private decompress(b64: string) {
@@ -464,6 +553,7 @@ export class KineticEngine {
             this.ws.close();
             this.ws = null;
         }
+        this.disconnectF1Insights();
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;

@@ -9,46 +9,9 @@ import { LocateFixed, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 export function MapMapper({ selectedDriver }: { selectedDriver: string | null }) {
   const driversMap = useKineticStore((state) => state.driversMap);
   const rs = useKineticStore(state => state.raceState);
-  const [trackPath, setTrackPath] = useState<{x: number, y: number}[]>([]);
   const connected = useKineticStore(state => state.connected);
   
-  // Fetch initial track layout from OpenF1
-  useEffect(() => {
-     let isMounted = true;
-     const fetchTrack = async () => {
-         try {
-             // Fetch a completed lap to get a clean layout from any driver
-             const lapRes = await fetch('https://api.openf1.org/v1/laps?session_key=latest');
-             if (!lapRes.ok) return;
-             const lapsData = await lapRes.json();
-             if (!lapsData || lapsData.length < 2) return;
-             
-             // Find a good complete lap
-             const lap = lapsData.find((l: any) => l.lap_duration && l.lap_duration > 60 && l.lap_duration < 150) || lapsData[1];
-             if (!lap || !lap.date_start || !lap.lap_duration || !lap.driver_number) return;
-
-             const startDate = new Date(lap.date_start);
-             const endDate = new Date(startDate.getTime() + lap.lap_duration * 1000);
-
-             const res = await fetch(`https://api.openf1.org/v1/location?session_key=latest&driver_number=${lap.driver_number}&date>=${startDate.toISOString()}&date<=${endDate.toISOString()}`);
-             if (!res.ok) return;
-             const data = await res.json();
-             if (data && data.length > 0 && isMounted) {
-                 const newPath: {x: number, y: number}[] = [];
-                 for (let i = 0; i < data.length; i += 2) { // Less subsampling for smoother curve
-                     if (data[i].x !== 0 && data[i].y !== 0) {
-                         newPath.push({ x: data[i].x, y: data[i].y });
-                     }
-                 }
-                 setTrackPath(newPath);
-             }
-         } catch (e) {
-             // Silently fail if OpenF1 is unavailable
-         }
-     };
-     fetchTrack();
-     return () => { isMounted = false; };
-  }, []);
+  const trackPath = rs.ReferenceTrack || [];
 
   // Determine circuit SVG slug
   const svgSlug = useMemo(() => {

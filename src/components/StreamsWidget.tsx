@@ -6,10 +6,8 @@ export function StreamsWidget() {
     const [quality, setQuality] = useState<'SD' | 'HD'>('SD');
 
     const urls = {
-        SD: '',
-        HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1',
-        HD1: 'https://gooz.aapmains.net/new-stream-embed/52517?ad=111',
-        HD2: 'https://videocdn-4726.website/shopping2/?channel_id=sky_sport_f1_uk'
+        SD: 'https://streamcrichd.com/update/skyf1.php',
+        HD: 'https://embedsports.me/fia-f1/sky-sports-f1-sky-f1-stream-1'
     };
 
     return (
@@ -31,18 +29,6 @@ export function StreamsWidget() {
                         onClick={() => setQuality('HD')}
                     >
                         HD
-                    </button>
-                                        <button 
-                        className={cn("px-3 py-1 text-[10px] font-bold rounded transition-colors", quality === 'HD1' ? "bg-red-600 text-white" : "text-white/50 hover:bg-white/10")}
-                        onClick={() => setQuality('HD1')}
-                    >
-                        HD1
-                    </button>
-                                        <button 
-                        className={cn("px-3 py-1 text-[10px] font-bold rounded transition-colors", quality === 'HD2' ? "bg-red-600 text-white" : "text-white/50 hover:bg-white/10")}
-                        onClick={() => setQuality('HD2')}
-                    >
-                        HD2
                     </button>
                 </div>
             </div>
