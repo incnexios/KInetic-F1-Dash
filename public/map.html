@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+  html,body{ margin:0; padding:0; height:100%; background:#0A0C0F; overflow:hidden; }
+  canvas{ display:block; width:100%; height:100%; cursor:grab; }
+  canvas.dragging{ cursor:grabbing; }
+  .zoom-controls{
+    position:fixed; right:16px; bottom:16px;
+    display:flex; flex-direction:column; gap:6px;
+    z-index:10;
+  }
+  .zoom-controls button{
+    width:36px; height:36px;
+    background:#12151A; border:1px solid #23272E; color:#E7EAEE;
+    font-family:monospace; font-size:18px; line-height:1;
+    border-radius:4px; cursor:pointer;
+  }
+  .zoom-controls button:hover{ background:#1A1E24; }
+  .zoom-controls button:active{ background:#23272E; }
+</style>
+</head>
+<body>
+<canvas id="mapCanvas"></canvas>
+<div class="zoom-controls">
+  <button id="zoomIn">+</button>
+  <button id="zoomOut">−</button>
+  <button id="zoomReset">⟲</button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const WS_URL = "wss://api.pitwall.me/ws";
+  const RECONNECT_MS = 5000;
+  const TRAIL_MAX = 12000;
+
+  const canvas = document.getElementById('mapCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let ws = null;
+  let reconnectTimer = null;
+
+  // ---- state -------------------------------------------------------
+  const driverList = {};      // racingNumber -> { tla, teamColour }
+  const timingLines = {};     // racingNumber -> { inPit, retired }
+  const carPos = {};          // racingNumber -> { x, y }
+  const trail = [];           // accumulated points that trace the circuit
+  let lastTrailPoint = {};
+
+  let bounds = null;          // {minX,maxX,minY,maxY}
+
+  // ---- view transform (zoom / pan) ----------------------------------
+  let zoom = 1;
+  let panX = 0, panY = 0;     // extra offset in screen px, on top of auto-fit
+  const MIN_ZOOM = 0.3, MAX_ZOOM = 8;
+
+  let isDragging = false;
+  let dragStart = { x:0, y:0 };
+  let panStart = { x:0, y:0 };
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    canvas.classList.add('dragging');
+    dragStart = { x: e.clientX, y: e.clientY };
+    panStart = { x: panX, y: panY };
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    panX = panStart.x + (e.clientX - dragStart.x);
+    panY = panStart.y + (e.clientY - dragStart.y);
+  });
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    canvas.classList.remove('dragging');
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const before = zoom;
+    zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * (e.deltaY < 0 ? 1.12 : 0.89)));
+    // zoom toward cursor position
+    const scaleChange = zoom / before;
+    panX = mx - (mx - panX) * scaleChange;
+    panY = my - (my - panY) * scaleChange;
+  }, { passive:false });
+
+  // touch support (pinch + drag)
+  let touchState = null;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1){
+      isDragging = true;
+      dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      panStart = { x: panX, y: panY };
+    } else if (e.touches.length === 2){
+      isDragging = false;
+      touchState = pinchInfo(e.touches);
+    }
+  }, { passive:true });
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 1 && isDragging){
+      panX = panStart.x + (e.touches[0].clientX - dragStart.x);
+      panY = panStart.y + (e.touches[0].clientY - dragStart.y);
+    } else if (e.touches.length === 2 && touchState){
+      const now = pinchInfo(e.touches);
+      const before = zoom;
+      zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * (now.dist / touchState.dist)));
+      const scaleChange = zoom / before;
+      panX = now.midX - (now.midX - panX) * scaleChange;
+      panY = now.midY - (now.midY - panY) * scaleChange;
+      touchState = now;
+    }
+  }, { passive:true });
+  canvas.addEventListener('touchend', () => { isDragging = false; touchState = null; });
+
+  function pinchInfo(touches){
+    const rect = canvas.getBoundingClientRect();
+    const [a,b] = [touches[0], touches[1]];
+    return {
+      dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+      midX: (a.clientX + b.clientX)/2 - rect.left,
+      midY: (a.clientY + b.clientY)/2 - rect.top
+    };
+  }
+
+  document.getElementById('zoomIn').addEventListener('click', () => zoomAtCenter(1.25));
+  document.getElementById('zoomOut').addEventListener('click', () => zoomAtCenter(0.8));
+  document.getElementById('zoomReset').addEventListener('click', () => { zoom = 1; panX = 0; panY = 0; });
+
+  function zoomAtCenter(factor){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const before = zoom;
+    zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * factor));
+    const scaleChange = zoom / before;
+    panX = w/2 - (w/2 - panX) * scaleChange;
+    panY = h/2 - (h/2 - panY) * scaleChange;
+  }
+
+  // ---- websocket -------------------------------------------------------
+  function connect(){
+    try{
+      ws = new WebSocket(WS_URL);
+      ws.binaryType = 'arraybuffer';
+    }catch(e){
+      scheduleReconnect();
+      return;
+    }
+    ws.onmessage = (evt) => {
+      let raw;
+      try{
+        raw = (evt.data instanceof ArrayBuffer)
+          ? pako.inflate(new Uint8Array(evt.data), { to: 'string' })
+          : evt.data;
+        const obj = JSON.parse(raw);
+        if (obj && obj.type === 'bundle' && Array.isArray(obj.messages)){
+          obj.messages.forEach(processMessage);
+        } else {
+          processMessage(obj);
+        }
+      }catch(e){ /* ignore malformed frame */ }
+    };
+    ws.onclose = () => { ws = null; scheduleReconnect(); };
+    ws.onerror = () => {};
+  }
+
+  function scheduleReconnect(){
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, RECONNECT_MS);
+  }
+
+  function processMessage(msg){
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.R && typeof msg.R === 'object'){
+      applyInitialState(msg.R);
+      return;
+    }
+    if (Array.isArray(msg.M)){
+      msg.M.forEach(entry => {
+        if (entry && entry.H === 'Streaming' && entry.M === 'feed' && Array.isArray(entry.A) && entry.A.length >= 2){
+          applyFeedUpdate(entry.A[0], entry.A[1]);
+        }
+      });
+      return;
+    }
+    if (Array.isArray(msg) && msg.length >= 2 && typeof msg[0] === 'string'){
+      applyFeedUpdate(msg[0], msg[1]);
+    }
+  }
+
+  function applyInitialState(state){
+    if (state.DriverList) mergeDriverList(state.DriverList);
+    if (state.TimingData && state.TimingData.Lines) mergeTimingLines(state.TimingData.Lines);
+    const posBlob = state['Position.z'] || state.PositionZ;
+    if (posBlob) decodePositionBlob(posBlob);
+  }
+
+  function applyFeedUpdate(key, value){
+    switch(key){
+      case 'DriverList': mergeDriverList(value); break;
+      case 'TimingData': if (value && value.Lines) mergeTimingLines(value.Lines); break;
+      case 'Position.z':
+      case 'PositionZ': decodePositionBlob(value); break;
+      default: break;
+    }
+  }
+
+  function mergeDriverList(list){
+    for (const num in list){
+      if (!Object.prototype.hasOwnProperty.call(list, num)) continue;
+      const d = list[num];
+      if (!driverList[num]) driverList[num] = {};
+      if (d.Tla) driverList[num].tla = d.Tla;
+      if (d.TeamColour) driverList[num].teamColour = '#' + d.TeamColour.replace('#','');
+    }
+  }
+
+  function mergeTimingLines(lines){
+    for (const num in lines){
+      if (!Object.prototype.hasOwnProperty.call(lines, num)) continue;
+      const l = lines[num];
+      if (!timingLines[num]) timingLines[num] = {};
+      if (l.InPit !== undefined) timingLines[num].inPit = l.InPit;
+      if (l.Retired !== undefined) timingLines[num].retired = l.Retired;
+    }
+  }
+
+  function base64ToBytes(b64){
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+
+  function decodePositionBlob(b64){
+    if (!b64 || typeof b64 !== 'string') return;
+    let parsed;
+    try{
+      const bytes = base64ToBytes(b64);
+      const text = pako.inflateRaw(bytes, { to: 'string' });
+      parsed = JSON.parse(text);
+    }catch(e){ return; }
+    const frames = parsed && parsed.Position;
+    if (!Array.isArray(frames) || frames.length === 0) return;
+    const latest = frames[frames.length - 1];
+    if (!latest || !latest.Entries) return;
+
+    for (const num in latest.Entries){
+      if (!Object.prototype.hasOwnProperty.call(latest.Entries, num)) continue;
+      const e = latest.Entries[num];
+      if (typeof e.X !== 'number' || typeof e.Y !== 'number') continue;
+      carPos[num] = { x: e.X, y: e.Y };
+      pushTrailPoint(num, e.X, e.Y);
+    }
+  }
+
+  function pushTrailPoint(num, x, y){
+    const last = lastTrailPoint[num];
+    if (last){
+      const dx = x - last[0], dy = y - last[1];
+      if ((dx*dx + dy*dy) < 4000) return;
+    }
+    lastTrailPoint[num] = [x, y];
+    trail.push([x, y]);
+    if (trail.length > TRAIL_MAX) trail.splice(0, trail.length - TRAIL_MAX);
+
+    if (!bounds){
+      bounds = { minX:x, maxX:x, minY:y, maxY:y };
+    } else {
+      if (x < bounds.minX) bounds.minX = x;
+      if (x > bounds.maxX) bounds.maxX = x;
+      if (y < bounds.minY) bounds.minY = y;
+      if (y > bounds.maxY) bounds.maxY = y;
+    }
+  }
+
+  // ---- rendering -------------------------------------------------------
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function project(x, y, w, h, pad){
+    const bw = Math.max(bounds.maxX - bounds.minX, 1);
+    const bh = Math.max(bounds.maxY - bounds.minY, 1);
+    const fit = Math.min((w - pad*2) / bw, (h - pad*2) / bh);
+    const offX = pad + (w - pad*2 - bw*fit) / 2;
+    const offY = pad + (h - pad*2 - bh*fit) / 2;
+    const px = offX + (x - bounds.minX) * fit;
+    const py = h - (offY + (y - bounds.minY) * fit);
+    return [px * zoom + panX, py * zoom + panY];
+  }
+
+  function draw(){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    if (!bounds || trail.length < 2){
+      requestAnimationFrame(draw);
+      return;
+    }
+
+    ctx.fillStyle = '#3A424C';
+    const r = Math.max(1, 1.6 * Math.sqrt(zoom));
+    for (let i = 0; i < trail.length; i++){
+      const [px, py] = project(trail[i][0], trail[i][1], w, h, 44);
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    for (const num in carPos){
+      const p = carPos[num];
+      const d = driverList[num] || {};
+      const t = timingLines[num] || {};
+      if (t.retired) continue;
+      const [px, py] = project(p.x, p.y, w, h, 44);
+      const color = d.teamColour || '#9AA3AD';
+      const dotR = 5 * Math.sqrt(zoom);
+
+      ctx.beginPath();
+      ctx.arc(px, py, dotR, 0, Math.PI*2);
+      ctx.fillStyle = t.inPit ? 'rgba(154,163,173,0.5)' : color;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#0A0C0F';
+      ctx.stroke();
+
+      ctx.font = `600 ${Math.max(9, 10*Math.sqrt(zoom))}px monospace`;
+      ctx.fillStyle = '#E7EAEE';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(d.tla || num, px + dotR + 3, py);
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  requestAnimationFrame(draw);
+  connect();
+})();
+</script>
+</body>
+</html>
