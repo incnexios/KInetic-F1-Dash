@@ -81,7 +81,7 @@ export function MapMapper({ selectedDriver }: { selectedDriver: string | null })
     <div className="flex flex-col h-full w-full bg-[#181a20] rounded-lg overflow-hidden border border-white/10 transition-all duration-1000 relative">
         <iframe 
             id="map-iframe" 
-            src="http://fotmfms.vercel.app/" 
+            src="/map.html" 
             className="w-full h-full border-0 absolute inset-0 z-10" 
             title="F1 Map"
         />
