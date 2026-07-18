@@ -1,11 +1,106 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useKineticStore } from '../services/KineticEngine';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
+import pako from 'pako';
 
 export function TelemetryOverlay({ selectedDriver }: { selectedDriver?: string | null; onSelectDriver?: (d: string) => void }) {
   const driverNumber = selectedDriver || '';
   const driver = useKineticStore((state) => state.driversMap[driverNumber]);
+
+  const [liveTelemetry, setLiveTelemetry] = useState<{
+    throttle: number;
+    brake: number;
+    rpm: number;
+    speed: number;
+    gear: number;
+    drs: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!driverNumber) return;
+
+    let ws: WebSocket;
+    
+    const connect = () => {
+      ws = new WebSocket('wss://api.pitwall.me/ws');
+      ws.binaryType = 'arraybuffer';
+      
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ protocol: 'json', version: 1 }) + '\x1e');
+        
+        ws.send(JSON.stringify({
+          type: 1,
+          target: "Subscribe",
+          arguments: [["CarData.z"]],
+          invocationId: "1"
+        }) + '\x1e');
+      };
+      
+      ws.onmessage = (e) => {
+        try {
+          const raw = new Uint8Array(e.data);
+          const decompressed = pako.inflate(raw, { to: 'string' });
+          const frames = decompressed.split('\x1e');
+          
+          for (const frame of frames) {
+            if (!frame) continue;
+            const data = JSON.parse(frame);
+            
+            // Handle snapshot
+            if (data.R && data.R['CarData.z']) {
+               const decoded = decodeCarData(data.R['CarData.z']);
+               if (decoded?.Entries && decoded.Entries[0]?.Cars && decoded.Entries[0].Cars[driverNumber]) {
+                  setLiveTelemetry(mapTelemetry(decoded.Entries[0].Cars[driverNumber].Channels));
+               }
+            }
+            
+            // Handle incremental updates
+            if (data.M) {
+               for (const msg of data.M) {
+                   if (msg.M === 'feed' && msg.A && msg.A[0] === 'CarData.z') {
+                       const decoded = decodeCarData(msg.A[1]);
+                       if (decoded?.Entries && decoded.Entries[0]?.Cars && decoded.Entries[0].Cars[driverNumber]) {
+                          setLiveTelemetry(mapTelemetry(decoded.Entries[0].Cars[driverNumber].Channels));
+                       }
+                   }
+               }
+            }
+          }
+        } catch(err) {
+            // ignore parsing errors
+        }
+      };
+    };
+    
+    connect();
+    
+    return () => {
+       if (ws) ws.close();
+    };
+  }, [driverNumber]);
+
+  function decodeCarData(b64: string) {
+     try {
+       const bin = atob(b64);
+       const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+       return JSON.parse(pako.inflateRaw(bytes, { to: 'string' }));
+     } catch(e) {
+       return null;
+     }
+  }
+
+  function mapTelemetry(channels: Record<string, number>) {
+      // Channel map for car telemetry: "0"=RPM, "2"=Speed, "3"=Gear, "4"=Throttle, "5"=Brake, "45"=DRS.
+      return {
+         rpm: channels["0"] ?? 0,
+         speed: channels["2"] ?? 0,
+         gear: channels["3"] ?? 0,
+         throttle: channels["4"] ?? 0,
+         brake: channels["5"] ?? 0,
+         drs: channels["45"] ?? 0,
+      };
+  }
 
   if (!driver) {
     return (
@@ -15,7 +110,7 @@ export function TelemetryOverlay({ selectedDriver }: { selectedDriver?: string |
     );
   }
 
-  const t = driver.telemetry;
+  const t = liveTelemetry || driver.telemetry;
 
   return (
     <div className="h-full w-full bg-black border border-white/20 p-4 flex gap-6 relative overflow-hidden">
